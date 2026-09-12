@@ -4,7 +4,7 @@ import type { RepositoryFile } from "./file.service.js";
 export interface CodeChunk {
     chunkId: string;
     filePath: string;
-    content: String;
+    content: string;
     startLine: number;
     endLine: number;
 }
