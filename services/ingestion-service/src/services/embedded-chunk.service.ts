@@ -3,9 +3,10 @@ import { generateEmbedding } from "./embedding.service.js";
 
 export interface EmbeddedCodeChunk extends CodeChunk {
     embedding: number[];
+    repositoryId: string;
 }
 
-export async function embedChunk(chunk: CodeChunk): Promise<EmbeddedCodeChunk> {
+export async function embedChunk(chunk: CodeChunk, repositoryId: string): Promise<EmbeddedCodeChunk> {
     const embedding = await generateEmbedding(chunk.content);
-    return { ...chunk, embedding };
+    return { ...chunk, embedding, repositoryId };
 }

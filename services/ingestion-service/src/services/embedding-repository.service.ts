@@ -1,10 +1,10 @@
 import type { CodeChunk } from "./chunk.service.js";
 import { embedChunk, type EmbeddedCodeChunk } from "./embedded-chunk.service.js";
 
-export async function embedChunks(chunks: CodeChunk[]): Promise<EmbeddedCodeChunk[]> {
+export async function embedChunks(chunks: CodeChunk[], repositoryId: string): Promise<EmbeddedCodeChunk[]> {
     const embeddedChunks: EmbeddedCodeChunk[] = [];
     for (const chunk of chunks) {
-        const embeddedChunk = await embedChunk(chunk);
+        const embeddedChunk = await embedChunk(chunk, repositoryId);
         embeddedChunks.push(embeddedChunk);
     }
     return embeddedChunks;

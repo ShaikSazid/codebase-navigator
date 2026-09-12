@@ -1,0 +1,11 @@
+services:
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: codebase-navigator-chroma
+    ports:
+      - "8080:8000"
+    volumes:
+      - chroma_data:/data
+
+volumes:
+  chroma_data:
