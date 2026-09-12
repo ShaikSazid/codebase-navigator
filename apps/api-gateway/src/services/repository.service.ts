@@ -12,11 +12,26 @@ export function createRepositoryAnalysis(url: string) {
     const job = { jobId, url, status: "queued" as const}
     jobs.set(jobId, job);
     logger.info({ jobId, repositoryUrl: url, status: job.status }, "Repository analysis job required")
+    processRepositoryAnalysis(jobId);
     return {
         message: "Repository analysis started",
         jobId,
-        url
+        url,
+        status: job.status
     };
+}
+
+function processRepositoryAnalysis(jobId: string) {
+    const job = jobs.get(jobId);
+    if(!job) return;
+    job.status = "processing";
+    logger.info({ jobId, status: job.status }, "Repository analysis processing started");
+    setTimeout(() => {
+        const currentJob = jobs.get(jobId);
+        if(!currentJob) return;
+        currentJob.status = "completed";
+        logger.info({ jobId, status: job.status }, "Repository analysis completed");
+    }, 5000);
 }
 
 export function getRepositoryAnalysis(jobId: string) {

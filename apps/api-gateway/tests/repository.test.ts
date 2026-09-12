@@ -80,5 +80,29 @@ describe("POST /api/repositories", () => {
                 message: "Repository analysis job not found",
             });
         });
+
+        it("should eventually complete the repository analysis", async () => {
+            const createResponse = await request(app)
+                .post("/api/repositories")
+                .send({
+                    url: "https://github.com/facebook/react",
+                });
+
+            const { jobId } = createResponse.body;
+
+            const processingResponse = await request(app)
+                .get(`/api/repositories/${jobId}`);
+
+            expect(processingResponse.status).toBe(200);
+            expect(processingResponse.body.status).toBe("processing");
+
+            await new Promise((resolve) => setTimeout(resolve, 5100));
+
+            const completedResponse = await request(app)
+                .get(`/api/repositories/${jobId}`);
+
+            expect(completedResponse.status).toBe(200);
+            expect(completedResponse.body.status).toBe("completed");
+        });
     });
 });
