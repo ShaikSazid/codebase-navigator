@@ -5,6 +5,7 @@ import { pinoHttp } from "pino-http";
 import logger from "./logger/index.js";
 import healthRoutes from "./routes/health.routes.js";
 import repositoryRoutes from "./routes/repository.routes.js";
+import qaRoutes from "./routes/qa.routes.js";
 
 const app = express();
 
@@ -46,5 +47,6 @@ app.use(
 
 app.use("/api/health", healthRoutes);
 app.use("/api/repositories", repositoryRoutes);
+app.use("/api/qa", qaRoutes);
 
 export default app;

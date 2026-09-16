@@ -5,7 +5,7 @@ import { getCodeCollection } from "../src/services/vector-store.service.js";
 
 describe("ingestRepository", () => {
     it("should ingest a GitHub repository and store its code chunks", async () => {
-        const repositoryId = "integration-test-repository";
+        const repositoryId = "metadata-test-20260913";
 
         await ingestRepository(
             "https://github.com/octocat/Hello-World.git",
