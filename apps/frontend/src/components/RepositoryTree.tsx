@@ -1,256 +1,277 @@
-import { useMemo, useState } from "react";
-
+import { useMemo, useState, useCallback, type KeyboardEvent } from "react";
 import type { RepositoryTreeNode } from "../lib/repository.api";
+import {
+  Folder,
+  FolderOpen,
+  FileCode,
+  FileJson,
+  FileText,
+  FileSpreadsheet,
+  File,
+  ChevronRight,
+  Terminal,
+} from "lucide-react";
 
-interface RepositoryTreeProps {
+export interface RepositoryTreeProps {
   tree: RepositoryTreeNode;
+  onSelectFile?: (path: string, node: RepositoryTreeNode) => void;
 }
 
-function RepositoryTree({
+const INDENT = 16;
+
+export default function RepositoryTree({
   tree,
+  onSelectFile,
 }: RepositoryTreeProps) {
-  const [currentNode, setCurrentNode] =
-    useState<RepositoryTreeNode>(tree);
-
-  const [history, setHistory] = useState<
-    RepositoryTreeNode[]
-  >([]);
-
-  const children = useMemo(() => {
-    return [...(currentNode.children ?? [])].sort(
-      (a, b) => {
-        // Folders first
-        if (a.type !== b.type) {
-          return a.type === "folder" ? -1 : 1;
-        }
-
-        // Then alphabetical
-        return a.name.localeCompare(b.name);
-      },
-    );
-  }, [currentNode]);
-
-  function openNode(node: RepositoryTreeNode) {
-    if (node.type !== "folder") {
-      return;
+  const displayTree = useMemo(() => {
+    const children = tree.children ?? [];
+    if (
+      children.length === 1 &&
+      children[0].type === "folder" &&
+      children[0].name === tree.name
+    ) {
+      return children[0];
     }
+    return tree;
+  }, [tree]);
 
-    setHistory((previous) => [
-      ...previous,
-      currentNode,
-    ]);
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(
+    () => new Set([displayTree.path])
+  );
+  const [selectedNode, setSelectedNode] = useState<RepositoryTreeNode>(displayTree);
 
-    setCurrentNode(node);
-  }
+  const toggleFolder = useCallback((path: string) => {
+    setExpandedPaths((previous) => {
+      const next = new Set(previous);
+      next.has(path) ? next.delete(path) : next.add(path);
+      return next;
+    });
+  }, []);
 
-  function goBack() {
-    const previousNode =
-      history[history.length - 1];
+  const handleNodeClick = useCallback(
+    (node: RepositoryTreeNode) => {
+      setSelectedNode(node);
+      if (node.type === "folder") toggleFolder(node.path);
+      onSelectFile?.(node.path, node);
+    },
+    [onSelectFile, toggleFolder]
+  );
 
-    if (!previousNode) {
-      return;
-    }
-
-    setHistory((previous) =>
-      previous.slice(0, -1),
-    );
-
-    setCurrentNode(previousNode);
-  }
-
-  function goToRoot() {
-    setCurrentNode(tree);
-    setHistory([]);
-  }
+  const pathSegments = useMemo(() => {
+    if (!selectedNode.path) return [displayTree.name];
+    const parts = selectedNode.path.split("/").filter(Boolean);
+    return parts.length > 0 ? parts : [displayTree.name];
+  }, [selectedNode.path, displayTree.name]);
 
   return (
-    <div className="flex h-full flex-col bg-[#0E0F12]">
-      {/* Header */}
-      <div className="border-b border-[#1E2027] px-6 py-4">
-        <div className="flex items-center justify-between gap-4">
-          <div className="min-w-0">
-            <p className="font-mono text-[10px] uppercase tracking-wider text-[#6B7080]">
-              Repository
-            </p>
-
-            <h2 className="mt-1 truncate text-[18px] font-medium text-white">
-              {currentNode.name}
-            </h2>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={goBack}
-              disabled={history.length === 0}
-              className="rounded-md border border-[#1E2027] px-3 py-1.5 text-[12px] text-[#B0B4BD] transition hover:border-[#30333D] hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
-            >
-              ← Back
-            </button>
-
-            <button
-              type="button"
-              onClick={goToRoot}
-              disabled={history.length === 0}
-              className="rounded-md border border-[#1E2027] px-3 py-1.5 text-[12px] text-[#B0B4BD] transition hover:border-[#30333D] hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
-            >
-              Root
-            </button>
-          </div>
-        </div>
-
-        {/* Breadcrumb */}
-        <div className="mt-3 flex items-center gap-1 overflow-x-auto font-mono text-[11px]">
-          <button
-            type="button"
-            onClick={goToRoot}
-            className="shrink-0 text-[#8A8F98] hover:text-white"
-          >
-            {tree.name}
-          </button>
-
-          {history.slice(1).map((node) => (
-            <span
-              key={node.path}
-              className="flex shrink-0 items-center gap-1"
-            >
-              <span className="text-[#3F424B]">
-                /
-              </span>
-
-              <span className="text-[#6B7080]">
-                {node.name}
+    <div className="flex h-full w-full flex-col bg-transparent text-[#E2E8F0] font-sans">
+      {/* Breadcrumb Path Rail */}
+      <div className="flex items-center gap-2 border-b border-white/[0.08] pb-2.5 pt-0.5 mb-2.5 shrink-0 bg-transparent">
+        <Terminal className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
+        <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto whitespace-nowrap font-mono text-[12px] tracking-tight text-slate-400 custom-scrollbar bg-transparent">
+          {pathSegments.map((segment, index) => (
+            <span key={index} className="flex items-center gap-1.5 shrink-0 bg-transparent">
+              {index > 0 && <span className="text-slate-600">/</span>}
+              <span
+                className={
+                  index === pathSegments.length - 1
+                    ? "text-indigo-300 font-semibold"
+                    : "text-slate-400 hover:text-white transition-colors"
+                }
+              >
+                {segment}
               </span>
             </span>
           ))}
-
-          {currentNode !== tree && (
-            <>
-              <span className="text-[#3F424B]">
-                /
-              </span>
-
-              <span className="text-[#B0B4BD]">
-                {currentNode.name}
-              </span>
-            </>
-          )}
         </div>
       </div>
 
-      {/* Tree content */}
-      <div className="flex-1 overflow-auto px-6 py-6">
-        <div className="mx-auto max-w-[900px]">
-          {/* Current folder */}
-          <div className="mb-5 flex items-center gap-2">
-            <span className="text-[20px]">
-              {currentNode.type === "folder"
-                ? "📁"
-                : "📄"}
-            </span>
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.15);
+          border-radius: 9999px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(255, 255, 255, 0.25);
+        }
+        .custom-scrollbar { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent; }
 
-            <span className="text-[15px] font-medium text-white">
-              {currentNode.name}
-            </span>
+        @keyframes tree-reveal {
+          from { opacity: 0; transform: translateY(-2px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .tree-branch { animation: tree-reveal 120ms ease-out; }
+      `}</style>
 
-            <span className="font-mono text-[11px] text-[#6B7080]">
-              {children.length}{" "}
-              {children.length === 1
-                ? "item"
-                : "items"}
-            </span>
-          </div>
-
-          {/* Children */}
-          {children.length > 0 ? (
-            <div className="relative ml-3">
-              {/* Vertical tree line */}
-              <div className="absolute bottom-5 left-[13px] top-5 w-px bg-[#252832]" />
-
-              <div className="space-y-1">
-                {children.map((node) => (
-                  <RepositoryTreeItem
-                    key={node.path}
-                    node={node}
-                    onOpen={openNode}
-                  />
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-lg border border-dashed border-[#252832] px-5 py-8 text-center text-[13px] text-[#6B7080]">
-              This folder is empty.
-            </div>
-          )}
-        </div>
+      {/* Tree Canvas */}
+      <div className="custom-scrollbar flex-1 overflow-y-auto pr-1 bg-transparent">
+        <RepositoryTreeNodeView
+          node={displayTree}
+          depth={0}
+          expandedPaths={expandedPaths}
+          selectedPath={selectedNode.path}
+          onNodeClick={handleNodeClick}
+        />
       </div>
     </div>
   );
 }
 
-interface RepositoryTreeItemProps {
+interface RepositoryTreeNodeViewProps {
   node: RepositoryTreeNode;
-  onOpen: (
-    node: RepositoryTreeNode,
-  ) => void;
+  depth: number;
+  expandedPaths: Set<string>;
+  selectedPath: string | null;
+  onNodeClick: (node: RepositoryTreeNode) => void;
 }
 
-function RepositoryTreeItem({
+function RepositoryTreeNodeView({
   node,
-  onOpen,
-}: RepositoryTreeItemProps) {
+  depth,
+  expandedPaths,
+  selectedPath,
+  onNodeClick,
+}: RepositoryTreeNodeViewProps) {
   const isFolder = node.type === "folder";
+  const isExpanded = isFolder && expandedPaths.has(node.path);
+  const isSelected = selectedPath === node.path;
 
-  const childCount =
-    node.children?.length ?? 0;
+  const children = useMemo(() => {
+    return [...(node.children ?? [])].sort((a, b) => {
+      if (a.type !== b.type) return a.type === "folder" ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [node.children]);
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onNodeClick(node);
+    }
+  };
 
   return (
-    <button
-      type="button"
-      onClick={() => onOpen(node)}
-      disabled={!isFolder}
-      className={`group relative flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left transition ${
-        isFolder
-          ? "cursor-pointer hover:bg-[#16181E]"
-          : "cursor-default"
-      }`}
-    >
-      {/* Tree connector */}
-      <span className="absolute left-[-1px] top-1/2 h-px w-4 bg-[#252832]" />
-
-      {/* Icon */}
-      <span className="relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[#252832] bg-[#0E0F12] text-[14px]">
-        {isFolder ? "📁" : "📄"}
-      </span>
-
-      {/* Name */}
-      <span
-        className={`min-w-0 flex-1 truncate text-[13px] ${
-          isFolder
-            ? "font-medium text-[#EDEDEF]"
-            : "font-mono text-[#B0B4BD]"
-        }`}
+    <div className="bg-transparent">
+      <button
+        type="button"
+        onClick={() => onNodeClick(node)}
+        onKeyDown={handleKeyDown}
+        aria-expanded={isFolder ? isExpanded : undefined}
+        aria-current={isSelected ? "true" : undefined}
+        className="group relative flex w-full items-center gap-2 py-[5px] pr-2 text-left outline-none transition-all duration-150 cursor-pointer bg-transparent"
+        style={{ paddingLeft: `${depth * INDENT + 6}px` }}
       >
-        {node.name}
-      </span>
+        {isSelected && (
+          <span className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-[2.5px] rounded-full bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.8)]" />
+        )}
 
-      {/* Folder metadata */}
-      {isFolder && (
-        <>
-          <span className="shrink-0 font-mono text-[10px] text-[#6B7080]">
-            {childCount}{" "}
-            {childCount === 1
-              ? "item"
-              : "items"}
-          </span>
+        {Array.from({ length: depth }).map((_, i) => (
+          <span
+            key={i}
+            className="pointer-events-none absolute top-0 h-full w-px bg-white/[0.07]"
+            style={{ left: `${i * INDENT + 12}px` }}
+          />
+        ))}
 
-          <span className="shrink-0 text-[13px] text-[#5C606B] transition group-hover:translate-x-0.5 group-hover:text-[#B0B4BD]">
-            →
-          </span>
-        </>
+        <span
+          className={`relative z-10 flex h-3.5 w-3.5 shrink-0 items-center justify-center transition-transform duration-150 ${
+            isSelected
+              ? "text-indigo-400"
+              : "text-slate-500 group-hover:text-slate-300"
+          } ${isFolder ? (isExpanded ? "rotate-90" : "rotate-0") : "opacity-0"}`}
+        >
+          <ChevronRight className="h-3.5 w-3.5" />
+        </span>
+
+        <span className="relative z-10 flex h-4 w-4 shrink-0 items-center justify-center">
+          {isFolder ? (
+            isExpanded ? (
+              <FolderOpen className="h-4 w-4 text-indigo-400 shrink-0" />
+            ) : (
+              <Folder className="h-4 w-4 text-slate-400 group-hover:text-indigo-300 transition-colors shrink-0" />
+            )
+          ) : (
+            getFileIcon(node.name, isSelected)
+          )}
+        </span>
+
+        <span
+          className={`relative z-10 min-w-0 flex-1 truncate tracking-tight transition-colors ${
+            isSelected
+              ? "text-[13.5px] font-medium text-indigo-200"
+              : isFolder
+              ? "text-[13.5px] font-medium text-slate-200 group-hover:text-white"
+              : "font-mono text-[12.5px] text-slate-400 group-hover:text-slate-200"
+          }`}
+        >
+          {node.name}
+        </span>
+      </button>
+
+      {isFolder && isExpanded && (
+        <div className="tree-branch bg-transparent">
+          {children.length > 0 ? (
+            children.map((child) => (
+              <RepositoryTreeNodeView
+                key={child.path}
+                node={child}
+                depth={depth + 1}
+                expandedPaths={expandedPaths}
+                selectedPath={selectedPath}
+                onNodeClick={onNodeClick}
+              />
+            ))
+          ) : (
+            <div
+              className="relative py-1.5 font-mono text-[11px] italic text-slate-500 bg-transparent"
+              style={{ paddingLeft: `${(depth + 1) * INDENT + 6}px` }}
+            >
+              {Array.from({ length: depth + 1 }).map((_, i) => (
+                <span
+                  key={i}
+                  className="pointer-events-none absolute top-0 h-full w-px bg-white/[0.07]"
+                  style={{ left: `${i * INDENT + 12}px` }}
+                />
+              ))}
+              <span className="relative z-10">empty directory</span>
+            </div>
+          )}
+        </div>
       )}
-    </button>
+    </div>
   );
 }
 
-export default RepositoryTree;
+function getFileIcon(fileName: string, isSelected: boolean) {
+  const ext = fileName.split(".").pop()?.toLowerCase();
+  const cls = `h-4 w-4 shrink-0 transition-opacity ${
+    isSelected ? "opacity-100" : "opacity-85"
+  }`;
+
+  switch (ext) {
+    case "ts":
+    case "tsx":
+      return <FileCode className={`${cls} text-cyan-400`} />;
+    case "js":
+    case "jsx":
+      return <FileCode className={`${cls} text-amber-400`} />;
+    case "json":
+      return <FileJson className={`${cls} text-emerald-400`} />;
+    case "md":
+    case "txt":
+      return <FileText className={`${cls} text-slate-400`} />;
+    case "css":
+    case "scss":
+    case "html":
+      return <FileCode className={`${cls} text-pink-400`} />;
+    case "py":
+      return <FileCode className={`${cls} text-indigo-400`} />;
+    case "sql":
+    case "csv":
+      return <FileSpreadsheet className={`${cls} text-teal-400`} />;
+    default:
+      return <File className={`${cls} text-slate-500`} />;
+  }
+}
