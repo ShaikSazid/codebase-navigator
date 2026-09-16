@@ -14,6 +14,57 @@ const ai = new GoogleGenAI({
   apiKey: config.geminiApiKey,
 });
 
+async function generateMapperResponse(
+  prompt: string,
+  maxAttempts = 3,
+) {
+  let lastError: unknown;
+
+  for (
+    let attempt = 1;
+    attempt <= maxAttempts;
+    attempt++
+  ) {
+    try {
+      return await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+        },
+      });
+    } catch (error) {
+      lastError = error;
+
+      const status =
+        typeof error === "object" &&
+        error !== null &&
+        "status" in error
+          ? error.status
+          : undefined;
+
+      const isRetryable =
+        status === 503 || status === 429;
+
+      if (!isRetryable || attempt === maxAttempts) {
+        throw error;
+      }
+
+      const delay = 1000 * 2 ** (attempt - 1);
+
+      console.log(
+        `Mapper Gemini request failed with ${status}. Retrying in ${delay}ms...`,
+      );
+
+      await new Promise((resolve) =>
+        setTimeout(resolve, delay),
+      );
+    }
+  }
+
+  throw lastError;
+}
+
 export function detectStructuralPattern(
   repository: RepoFileIndex,
 ): boolean {
@@ -274,13 +325,8 @@ Rules:
 - Return ONLY valid JSON.
 `;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-    },
-  });
+  const response =
+    await generateMapperResponse(prompt);
 
   const text = response.text;
 
