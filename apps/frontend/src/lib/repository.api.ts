@@ -19,6 +19,11 @@ export interface ArchitectureLayer {
   files: string[];
 }
 
+export interface RepositoryFile {
+  path: string;
+  content: string;
+}
+
 export interface RankedFile {
   path: string;
   importanceScore: number;
@@ -66,6 +71,22 @@ export async function getRepositoryStatus(
     await api.get<RepositoryAnalysisJob>(
       `/api/repositories/${jobId}`,
     );
+
+  return response.data;
+}
+
+export async function getRepositoryFile(
+  repositoryId: string,
+  filePath: string,
+): Promise<RepositoryFile> {
+  const response = await api.get(
+    `/api/repositories/${repositoryId}/files`,
+    {
+      params: {
+        path: filePath,
+      },
+    },
+  );
 
   return response.data;
 }
