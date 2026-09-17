@@ -155,3 +155,19 @@ export function getRepositoryAnalysis(
 
   return job;
 }
+
+export async function getRepositoryFile(
+  repositoryId: string,
+  filePath: string,
+) {
+  const response = await axios.get(
+    `${INGESTION_SERVICE_URL}/internal/repositories/${repositoryId}/files`,
+    {
+      params: {
+        path: filePath,
+      },
+    },
+  );
+
+  return response.data;
+}

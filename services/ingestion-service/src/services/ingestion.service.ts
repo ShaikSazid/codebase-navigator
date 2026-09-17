@@ -5,7 +5,10 @@ import {
   cleanupRepository,
 } from "./repository.service.js";
 
-import { readRepositoryFiles } from "./file.service.js";
+import {
+  readRepositoryFiles,
+  type RepositoryFile,
+} from "./file.service.js";
 
 import { chunkRepository } from "./chunk-repository.service.js";
 
@@ -25,6 +28,23 @@ interface IngestionResult {
   repositoryTree: RepositoryTreeNode;
 }
 
+/*
+ * Temporarily keep repository files in memory.
+ *
+ * Key:
+ *   repositoryId
+ *
+ * Value:
+ *   All files that were read during ingestion.
+ *
+ * This allows us to retrieve the source code later
+ * when the user clicks a file in the repository tree.
+ */
+const repositoryFiles = new Map<
+  string,
+  RepositoryFile[]
+>();
+
 const AGENT_ORCHESTRATOR_URL =
   process.env.AGENT_ORCHESTRATOR_URL ||
   "http://localhost:5003";
@@ -39,6 +59,15 @@ export async function ingestRepository(
   try {
     const files =
       await readRepositoryFiles(repositoryPath);
+
+    /*
+     * Keep the repository files available after
+     * the temporary repository is cleaned up.
+     */
+    repositoryFiles.set(
+      repositoryId,
+      files,
+    );
 
     // --------------------------------------------------
     // Build repository tree
@@ -65,6 +94,7 @@ export async function ingestRepository(
 
     // The Mapper depends on this,
     // not on embeddings.
+
     const repositoryIndex =
       buildRepositoryIndex(
         repositoryId,
@@ -72,7 +102,11 @@ export async function ingestRepository(
       );
 
     console.log(
-      `Repository index built: ${repositoryIndex.files.length} files, ${repositoryIndex.dependencyEdges.length} dependencies`,
+      `Repository index built: ${
+        repositoryIndex.files.length
+      } files, ${
+        repositoryIndex.dependencyEdges.length
+      } dependencies`,
     );
 
     // --------------------------------------------------
@@ -81,6 +115,7 @@ export async function ingestRepository(
 
     // Run the Mapper independently
     // of the RAG pipeline.
+
     const mapperResponse =
       await axios.post(
         `${AGENT_ORCHESTRATOR_URL}/internal/map`,
@@ -100,6 +135,7 @@ export async function ingestRepository(
     //
     // A Gemini quota failure here should not prevent
     // architecture analysis from completing.
+
     try {
       const chunks =
         chunkRepository(files);
@@ -119,7 +155,9 @@ export async function ingestRepository(
       );
 
       console.log(
-        `Repository embeddings stored: ${embeddedChunks.length}`,
+        `Repository embeddings stored: ${
+          embeddedChunks.length
+        }`,
       );
     } catch (error) {
       console.error(
@@ -141,6 +179,28 @@ export async function ingestRepository(
       repositoryPath,
     );
   }
+}
+
+// --------------------------------------------------
+// Retrieve one repository file
+// --------------------------------------------------
+
+export function getRepositoryFile(
+  repositoryId: string,
+  filePath: string,
+): RepositoryFile | null {
+  const files =
+    repositoryFiles.get(repositoryId);
+
+  if (!files) {
+    return null;
+  }
+
+  return (
+    files.find(
+      (file) => file.path === filePath,
+    ) ?? null
+  );
 }
 
 // --------------------------------------------------
