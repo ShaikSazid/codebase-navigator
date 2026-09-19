@@ -23,7 +23,7 @@ export async function cloneRepository(url: string): Promise<string> {
       destination,
     ],
     {
-      timeout: 30_000,
+      timeout: 300_000,
     }
   );
 

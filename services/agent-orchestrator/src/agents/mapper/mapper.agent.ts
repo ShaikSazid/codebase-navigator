@@ -44,7 +44,7 @@ async function generateMapperResponse(
           : undefined;
 
       const isRetryable =
-        status === 503 || status === 429;
+  status === 503;
 
       if (!isRetryable || attempt === maxAttempts) {
         throw error;
@@ -198,6 +198,109 @@ export function applyDeterministicRanking(
   }));
 }
 
+function buildDeterministicArchitectureMap(
+  repository: RepoFileIndex,
+  isStructured: boolean,
+  rankedFiles: Array<{
+    path: string;
+    importanceScore: number;
+  }>,
+): ArchitectureMap {
+  /*
+   * ------------------------------------------------------------
+   * Structured repository fallback
+   * ------------------------------------------------------------
+   *
+   * We cannot ask Gemini to semantically describe architecture
+   * when Gemini is unavailable.
+   *
+   * Instead, deterministically group files by their top-level
+   * directory. This gives the UI a useful repository map without
+   * inventing architectural meaning.
+   */
+  if (isStructured) {
+    const groups = new Map<string, string[]>();
+
+    for (const file of repository.files) {
+      const pathParts = file.path.split("/");
+
+      const groupName =
+        pathParts.length > 1
+          ? pathParts[0]
+          : "root";
+
+      const existing =
+        groups.get(groupName) ?? [];
+
+      existing.push(file.path);
+
+      groups.set(groupName, existing);
+    }
+
+    const layers = Array.from(
+      groups.entries(),
+    ).map(
+      ([name, files]) => ({
+        name,
+        description:
+          name === "root"
+            ? "Files located at the repository root."
+            : `Files grouped under the ${name} directory.`,
+        files,
+      }),
+    );
+
+    return {
+      type: "structured",
+      layers,
+      summary:
+        "Deterministic repository map generated from directory structure because the AI mapper was unavailable.",
+    };
+  }
+
+  /*
+   * ------------------------------------------------------------
+   * Importance-ranked repository fallback
+   * ------------------------------------------------------------
+   */
+
+  const incomingCounts =
+    countIncomingReferences(
+      repository.dependencyEdges,
+    );
+
+  const generatedFiles =
+    rankedFiles.map((file) => {
+      const incomingCount =
+        incomingCounts[file.path] ?? 0;
+
+      return {
+        path: file.path,
+        importanceScore:
+          file.importanceScore,
+        reason:
+          incomingCount > 0
+            ? `Referenced by ${incomingCount} internal file${
+                incomingCount === 1
+                  ? ""
+                  : "s"
+              } in the repository dependency graph.`
+            : "No internal files reference this file; its importance score is based on available dependency evidence.",
+      };
+    });
+
+  return {
+    type: "importance-ranked",
+    rankedFiles:
+      applyDeterministicRanking(
+        rankedFiles,
+        generatedFiles,
+      ),
+    summary:
+      "Deterministic file ranking generated from the repository dependency graph because the AI mapper was unavailable.",
+  };
+}
+
 export async function runMapperAgent(
   input: MapperInput,
 ): Promise<ArchitectureMap> {
@@ -325,10 +428,38 @@ Rules:
 - Return ONLY valid JSON.
 `;
 
-  const response =
-    await generateMapperResponse(prompt);
+  let response;
 
-  const text = response.text;
+try {
+  response =
+    await generateMapperResponse(prompt);
+} catch (error) {
+  const status =
+    typeof error === "object" &&
+    error !== null &&
+    "status" in error
+      ? error.status
+      : undefined;
+
+  if (
+    status === 429 ||
+    status === 503
+  ) {
+    console.warn(
+      `Mapper Gemini unavailable with status ${status}. Using deterministic fallback.`,
+    );
+
+    return buildDeterministicArchitectureMap(
+      repository,
+      isStructured,
+      rankedFiles,
+    );
+  }
+
+  throw error;
+}
+
+const text = response.text;
 
   if (!text) {
     throw new Error(
