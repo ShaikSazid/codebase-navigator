@@ -130,8 +130,6 @@ storage/
 # Generated AI / vector database data
 # ============================================================
 
-chroma/
-.chromadb/
 vectorstore/
 embeddings/
 

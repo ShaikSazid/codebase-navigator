@@ -1,11 +1,12 @@
 services:
-  chroma:
-    image: chromadb/chroma:latest
-    container_name: codebase-navigator-chroma
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: codebase-navigator-qdrant
     ports:
-      - "8080:8000"
+      - "6333:6333"
+      - "6334:6334"
     volumes:
-      - chroma_data:/data
+      - qdrant_data:/qdrant/storage
 
 volumes:
-  chroma_data:
+  qdrant_data:

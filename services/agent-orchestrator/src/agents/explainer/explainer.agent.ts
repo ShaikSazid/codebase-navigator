@@ -293,7 +293,40 @@ RULES
       );
     }
 
-    return result.data;
+    const enrichedKeyFunctions =
+  result.data.keyFunctions.map(
+    (fn) => {
+      const symbol =
+        findSymbolForFunction(
+          fn.name,
+          input.symbols ?? [],
+        );
+
+      if (!symbol) {
+        return fn;
+      }
+
+      return {
+        ...fn,
+        kind: symbol.kind,
+        startLine:
+          symbol.startLine,
+        endLine:
+          symbol.endLine,
+        code: extractSymbolCode(
+          input.content,
+          symbol.startLine,
+          symbol.endLine,
+        ),
+      };
+    },
+  );
+
+return {
+  ...result.data,
+  keyFunctions:
+    enrichedKeyFunctions,
+};
   } catch (error) {
     if (error instanceof SyntaxError) {
       throw new Error(
@@ -334,4 +367,79 @@ function truncateContent(
 /* ... middle of file truncated ... */
 
 ${content.slice(-half)}`;
+}
+
+function findSymbolForFunction(
+  name: string,
+  symbols: NonNullable<
+    ExplainerInput["symbols"]
+  >,
+) {
+  const matches =
+    symbols.filter(
+      (symbol) =>
+        symbol.name === name,
+    );
+
+  if (matches.length === 0) {
+    return undefined;
+  }
+
+  /*
+   * Prefer executable symbols.
+   */
+  return (
+    matches.find(
+      (symbol) =>
+        symbol.kind ===
+          "function" ||
+        symbol.kind ===
+          "method",
+    ) ??
+    matches[0]
+  );
+}
+
+function extractSymbolCode(
+  content: string,
+  startLine: number,
+  endLine: number,
+  maxChars = 6000,
+): string {
+  const lines =
+    content.split(/\r?\n/);
+
+  const startIndex =
+    Math.max(
+      0,
+      startLine - 1,
+    );
+
+  const endIndex =
+    Math.min(
+      lines.length,
+      endLine,
+    );
+
+  const code =
+    lines
+      .slice(
+        startIndex,
+        endIndex,
+      )
+      .join("\n");
+
+  if (
+    code.length <=
+    maxChars
+  ) {
+    return code;
+  }
+
+  return `${code.slice(
+    0,
+    maxChars,
+  )}
+
+/* ... code snippet truncated ... */`;
 }

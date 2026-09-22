@@ -1,3 +1,5 @@
+import type { DataModel } from "./data-model/data-model.types.js";
+
 export type CodeSymbolKind =
   | "file"
   | "class"
@@ -10,14 +12,37 @@ export type CodeSymbolKind =
   | "type"
   | "variable"
   | "constant"
-  | "unknown";
+  | "route"
+  | "unknown"
+  | "model"
+  | "schema"
+  | "field"
 
 export type CodeRelationshipKind =
   | "imports"
   | "defines"
   | "references"
+  | "calls"
   | "implements"
-  | "extends";
+  | "extends"
+  | "routes_to"
+  | "handles"
+  | "mounts"
+  | "publishes"
+  | "consumes"
+  | "queries"
+  | "writes"
+  | "reads"
+  | "instantiates"
+  | "returns"
+  | "depends_on"
+  | "uses_schema"
+| "has_field"
+
+export interface ImportBinding {
+  importedName: string;
+  localName: string;
+}
 
 export interface NormalizedImport {
   raw: string;
@@ -25,6 +50,7 @@ export interface NormalizedImport {
   importedNames: string[];
   alias?: string;
   isWildcard: boolean;
+  bindings?: ImportBinding[];
   startLine?: number;
   endLine?: number;
 }
@@ -44,12 +70,20 @@ export interface CodeSymbol {
   startLine: number;
   endLine: number;
   signature?: string;
+  routePaths?: string[];
 }
 
 export interface CodeRelationship {
   source: string;
   target: string;
   kind: CodeRelationshipKind;
+  confidence?: number;
+  evidence?: {
+    filePath: string;
+    startLine: number;
+    endLine: number;
+    mountPath?: string;
+  };
 }
 
 export interface CodeIndex {
@@ -57,6 +91,7 @@ export interface CodeIndex {
   files: CodeFile[];
   symbols: CodeSymbol[];
   relationships: CodeRelationship[];
+  dataModels: DataModel[];
 }
 
 export interface RepositorySourceFile {

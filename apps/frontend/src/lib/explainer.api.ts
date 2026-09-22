@@ -18,9 +18,17 @@ export interface FileExplanation {
   responsibilities: string[];
 
   keyFunctions: Array<{
-    name: string;
-    explanation: string;
-  }>;
+  name: string;
+  explanation: string;
+
+  kind?: string;
+
+  startLine?: number;
+
+  endLine?: number;
+
+  code?: string;
+}>;
 
   dataFlow: string;
 

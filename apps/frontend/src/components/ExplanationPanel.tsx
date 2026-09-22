@@ -6,8 +6,6 @@ import {
   Brain,
   ChevronDown,
   GitBranch,
-  Info,
-  Layers3,
   ListChecks,
   Network,
   Sparkles,
@@ -29,19 +27,10 @@ export default function ExplanationPanel({
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center px-6">
-        <div className="w-full max-w-sm text-center">
-          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl border border-indigo-400/20 bg-indigo-500/10">
-            <Brain className="h-5 w-5 animate-pulse text-indigo-400" />
-          </div>
-
-          <p className="mt-4 text-sm font-medium text-slate-200">
-            Understanding this file
-          </p>
-
-          <p className="mt-2 text-xs leading-5 text-slate-500">
-            Reading the code, its relationships, and its role in the
-            repository.
-          </p>
+        <div className="text-center">
+          <Brain className="mx-auto h-6 w-6 animate-pulse text-indigo-400" />
+          <p className="mt-3 text-sm text-slate-300">Analyzing file architecture…</p>
+          <p className="mt-1 text-xs text-slate-500">Parsing source tree & relationships</p>
         </div>
       </div>
     );
@@ -50,16 +39,10 @@ export default function ExplanationPanel({
   if (error) {
     return (
       <div className="flex h-full items-center justify-center px-6">
-        <div className="w-full max-w-sm rounded-xl border border-red-400/10 bg-red-400/[0.03] p-5 text-center">
-          <AlertTriangle className="mx-auto h-5 w-5 text-red-400" />
-
-          <p className="mt-3 text-sm font-medium text-red-200">
-            Could not explain this file
-          </p>
-
-          <p className="mt-2 text-xs leading-5 text-red-200/50">
-            {error}
-          </p>
+        <div className="max-w-xs text-center">
+          <AlertTriangle className="mx-auto h-6 w-6 text-rose-400" />
+          <p className="mt-3 text-sm font-medium text-rose-300">Analysis error</p>
+          <p className="mt-1.5 text-[13px] leading-5 text-rose-200/60">{error}</p>
         </div>
       </div>
     );
@@ -68,17 +51,11 @@ export default function ExplanationPanel({
   if (!explanation) {
     return (
       <div className="flex h-full items-center justify-center px-6">
-        <div className="w-full max-w-sm text-center">
-          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.02]">
-            <Sparkles className="h-5 w-5 text-slate-600" />
-          </div>
-
-          <p className="mt-4 text-sm font-medium text-slate-400">
-            Understand this file with AI
-          </p>
-
-          <p className="mt-2 text-xs leading-5 text-slate-600">
-            Select a source file and choose “Explain with AI”.
+        <div className="text-center">
+          <Sparkles className="mx-auto h-6 w-6 text-slate-600" />
+          <p className="mt-3 text-sm text-slate-400">Select a file to inspect</p>
+          <p className="mt-1 text-xs text-slate-600">
+            Choose &quot;Explain with AI&quot; in the source panel
           </p>
         </div>
       </div>
@@ -86,418 +63,205 @@ export default function ExplanationPanel({
   }
 
   return (
-    <div className="custom-scrollbar h-full overflow-y-auto">
-      <div className="p-4 sm:p-5">
-        {/* -------------------------------------------------------
-            HEADER
-        ------------------------------------------------------- */}
-        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-4">
-          <div className="flex items-start gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-indigo-400/20 bg-indigo-500/10">
-              <Brain className="h-4 w-4 text-indigo-400" />
+    <div className="custom-scrollbar h-full overflow-y-auto bg-transparent font-sans">
+      <div className="mx-auto max-w-2xl px-6 py-8 space-y-9">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 border-b border-white/[0.08] pb-5">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              <Brain className="h-3.5 w-3.5 text-indigo-400" />
+              AI code guide
             </div>
-
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-indigo-300">
-                  AI Code Guide
-                </span>
-
-                <span className="rounded-full border border-emerald-400/10 bg-emerald-400/[0.04] px-2 py-0.5 text-[9px] uppercase tracking-wide text-emerald-300/70">
-                  Grounded
-                </span>
-              </div>
-
-              <p
-                className="mt-1.5 truncate font-mono text-[12px] text-slate-300"
-                title={explanation.filePath}
-              >
-                {explanation.filePath}
-              </p>
-            </div>
+            <p
+              className="mt-1.5 truncate font-mono text-[13px] text-slate-200"
+              title={explanation.filePath}
+            >
+              {explanation.filePath}
+            </p>
           </div>
+
+          <span className="shrink-0 rounded-full bg-emerald-400/10 px-2.5 py-1 text-[11px] font-medium text-emerald-400">
+            Grounded
+          </span>
         </div>
 
-        {/* -------------------------------------------------------
-            START HERE
-        ------------------------------------------------------- */}
-        <section className="mt-4">
-          <div className="mb-2 flex items-center gap-2">
-            <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
-
-            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-              Start here
-            </span>
-          </div>
-
-          <div className="rounded-2xl border border-indigo-400/15 bg-gradient-to-b from-indigo-500/[0.08] to-transparent p-4">
-            <p className="text-[15px] font-medium leading-6 text-slate-100">
-              {explanation.fileRole}
-            </p>
-
-            <p className="mt-3 text-[12px] leading-6 text-slate-400">
-              {explanation.whyExists}
-            </p>
-          </div>
+        {/* Overview */}
+        <section>
+          <p className="text-[15px] font-medium leading-6 text-slate-100">
+            {explanation.fileRole}
+          </p>
+          <p className="mt-2 text-[13.5px] leading-6 text-slate-400">
+            {explanation.whyExists}
+          </p>
         </section>
 
-        {/* -------------------------------------------------------
-            QUICK UNDERSTANDING
-        ------------------------------------------------------- */}
-        <section className="mt-4">
-          <SectionHeading
-            icon={<Info className="h-3.5 w-3.5" />}
-            title="At a glance"
-          />
-
-          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <InsightCard
-              title="What it handles"
-              value={
-                explanation.responsibilities.length > 0
-                  ? `${explanation.responsibilities.length} responsibilities`
-                  : "No responsibilities identified"
-              }
-              icon={<ListChecks className="h-3.5 w-3.5" />}
-            />
-
-            <InsightCard
-              title="Main code units"
-              value={
-                explanation.keyFunctions.length > 0
-                  ? `${explanation.keyFunctions.length} important units`
-                  : "No key units identified"
-              }
-              icon={<Layers3 className="h-3.5 w-3.5" />}
-            />
-
-            <InsightCard
-              title="Used by"
-              value={
-                explanation.usedBy.length > 0
-                  ? `${explanation.usedBy.length} caller${
-                      explanation.usedBy.length === 1 ? "" : "s"
-                    }`
-                  : "No known callers"
-              }
-              icon={<Network className="h-3.5 w-3.5" />}
-            />
-
-            <InsightCard
-              title="Concepts"
-              value={
-                explanation.keyConcepts.length > 0
-                  ? `${explanation.keyConcepts.length} important concepts`
-                  : "No specific concepts identified"
-              }
-              icon={<GitBranch className="h-3.5 w-3.5" />}
-            />
-          </div>
-        </section>
-
-        {/* -------------------------------------------------------
-            RESPONSIBILITIES
-        ------------------------------------------------------- */}
-        <SectionBlock
-          className="mt-5"
-          icon={<ListChecks className="h-3.5 w-3.5" />}
-          title="What this file is responsible for"
-        >
+        {/* Responsibilities */}
+        <Section title="Responsibilities">
           {explanation.responsibilities.length > 0 ? (
-            <div className="space-y-2">
-              {explanation.responsibilities.map(
-                (responsibility, index) => (
-                  <div
-                    key={`${responsibility}-${index}`}
-                    className="flex gap-3 rounded-xl border border-white/[0.06] bg-white/[0.018] px-3 py-3"
-                  >
-                    <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-indigo-500/10 text-[10px] font-semibold text-indigo-300">
-                      {index + 1}
-                    </div>
-
-                    <p className="text-[12px] leading-5 text-slate-400">
-                      {responsibility}
-                    </p>
-                  </div>
-                ),
-              )}
-            </div>
+            <ol className="space-y-2.5">
+              {explanation.responsibilities.map((responsibility, index) => (
+                <li key={`${responsibility}-${index}`} className="flex gap-3 text-[13.5px] leading-5 text-slate-300">
+                  <span className="mt-0.5 shrink-0 text-slate-600">{index + 1}.</span>
+                  {responsibility}
+                </li>
+              ))}
+            </ol>
           ) : (
             <EmptyValue />
           )}
-        </SectionBlock>
 
-        {/* -------------------------------------------------------
-            HOW IT WORKS
-        ------------------------------------------------------- */}
-        <SectionBlock
-          className="mt-5"
-          icon={<Layers3 className="h-3.5 w-3.5" />}
-          title="How the code works"
-        >
-          {explanation.keyFunctions.length > 0 ? (
-            <div className="relative space-y-2">
-              {explanation.keyFunctions.map(
-                (fn, index) => (
-                  <div
-                    key={`${fn.name}-${index}`}
-                    className="relative overflow-hidden rounded-xl border border-white/[0.06] bg-white/[0.018]"
-                  >
-                    <div className="flex items-start gap-3 px-3.5 py-3.5">
-                      <div className="relative flex shrink-0 flex-col items-center">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-cyan-400/15 bg-cyan-400/[0.06] text-[10px] font-semibold text-cyan-300">
-                          {index + 1}
-                        </div>
-
-                        {index <
-                          explanation.keyFunctions.length - 1 && (
-                          <div className="mt-1 h-5 w-px bg-white/[0.06]" />
-                        )}
-                      </div>
-
-                      <div className="min-w-0">
-                        <p className="font-mono text-[12px] font-medium text-cyan-300">
-                          {fn.name}
-                        </p>
-
-                        <p className="mt-1.5 text-[12px] leading-6 text-slate-400">
-                          {fn.explanation}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ),
-              )}
-            </div>
-          ) : (
-            <EmptyValue />
-          )}
-        </SectionBlock>
-
-        {/* -------------------------------------------------------
-            DATA FLOW
-        ------------------------------------------------------- */}
-        <SectionBlock
-          className="mt-5"
-          icon={<GitBranch className="h-3.5 w-3.5" />}
-          title="How information moves"
-        >
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.018] p-4">
-            <p className="whitespace-pre-line text-[12px] leading-6 text-slate-400">
-              {explanation.dataFlow}
-            </p>
-          </div>
-        </SectionBlock>
-
-        {/* -------------------------------------------------------
-            CONNECTIONS
-        ------------------------------------------------------- */}
-        <SectionBlock
-          className="mt-5"
-          icon={<Network className="h-3.5 w-3.5" />}
-          title="Where this file fits"
-        >
-          {explanation.usedBy.length > 0 ? (
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.018] p-3">
-              <p className="mb-2 text-[11px] leading-5 text-slate-500">
-                Other parts of the repository depend on this file:
-              </p>
-
-              <div className="space-y-1.5">
-                {explanation.usedBy.map(
-                  (item, index) => (
-                    <div
-                      key={`${item}-${index}`}
-                      className="flex items-center gap-2 rounded-lg border border-white/[0.05] bg-black/10 px-3 py-2"
-                    >
-                      <ArrowRight className="h-3 w-3 shrink-0 text-indigo-400" />
-
-                      <span className="break-all font-mono text-[11px] text-slate-400">
-                        {item}
+          {/* Key Functions / Code Units */}
+          {explanation.keyFunctions.length > 0 && (
+            <div className="mt-5 space-y-3">
+              {explanation.keyFunctions.map((fn, index) => (
+                <div
+                  key={`${fn.name}-${index}`}
+                  className="overflow-hidden rounded-lg border border-white/[0.08]"
+                >
+                  <div className="flex items-center justify-between gap-2 px-3.5 py-2 bg-white/[0.03]">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="truncate font-mono text-[12.5px] text-cyan-300">
+                        {fn.name}
                       </span>
+                      {fn.kind && (
+                        <span className="text-[10.5px] text-slate-500">{fn.kind}</span>
+                      )}
                     </div>
-                  ),
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.018] p-3">
-              <p className="text-[12px] leading-5 text-slate-500">
-                No caller information was available from the repository
-                index.
-              </p>
-            </div>
-          )}
-        </SectionBlock>
 
-        {/* -------------------------------------------------------
-            IMPORTANT CONCEPTS
-        ------------------------------------------------------- */}
-        <SectionBlock
-          className="mt-5"
-          icon={<Sparkles className="h-3.5 w-3.5" />}
-          title="Things to understand"
-        >
-          {explanation.keyConcepts.length > 0 ? (
-            <div className="space-y-2">
-              {explanation.keyConcepts.map(
-                (concept, index) => (
-                  <details
-                    key={`${concept.name}-${index}`}
-                    className="group rounded-xl border border-white/[0.06] bg-white/[0.018]"
-                  >
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-3">
-                      <span className="font-mono text-[11px] font-medium text-violet-300">
-                        {concept.name}
+                    {fn.startLine !== undefined && fn.endLine !== undefined && (
+                      <span className="shrink-0 font-mono text-[10.5px] text-slate-500">
+                        L{fn.startLine}–{fn.endLine}
                       </span>
+                    )}
+                  </div>
 
-                      <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-600 transition-transform group-open:rotate-180" />
-                    </summary>
+                  {fn.code && <CodeSnippet code={fn.code} startLine={fn.startLine} />}
 
-                    <div className="border-t border-white/[0.05] px-3.5 py-3">
-                      <p className="text-[12px] leading-6 text-slate-400">
-                        {concept.explanation}
-                      </p>
-                    </div>
-                  </details>
-                ),
-              )}
-            </div>
-          ) : (
-            <EmptyValue />
-          )}
-        </SectionBlock>
-
-        {/* -------------------------------------------------------
-            UNCERTAINTY
-        ------------------------------------------------------- */}
-        <section className="mt-5">
-          <details className="group rounded-xl border border-white/[0.06] bg-white/[0.018]">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-3">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
-
-                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Uncertainty & limitations
-                </span>
-              </div>
-
-              <ChevronDown className="h-3.5 w-3.5 text-slate-600 transition-transform group-open:rotate-180" />
-            </summary>
-
-            <div className="border-t border-white/[0.05] px-3.5 py-3.5">
-              {explanation.uncertainty.length > 0 ? (
-                <div className="space-y-2">
-                  {explanation.uncertainty.map(
-                    (item, index) => (
-                      <div
-                        key={`${item}-${index}`}
-                        className="rounded-lg border border-amber-400/10 bg-amber-400/[0.025] px-3 py-2.5"
-                      >
-                        <p className="text-[12px] leading-5 text-amber-200/60">
-                          {item}
-                        </p>
-                      </div>
-                    ),
-                  )}
+                  <p className="px-3.5 py-2.5 text-[12.5px] leading-5 text-slate-400 bg-[#0A0B0E]">
+                    {fn.explanation}
+                  </p>
                 </div>
-              ) : (
-                <p className="text-[12px] leading-5 text-emerald-300/60">
-                  No important limitations were identified from the supplied
-                  repository evidence.
-                </p>
-              )}
+              ))}
             </div>
-          </details>
-        </section>
+          )}
+        </Section>
 
-        <p className="mt-5 px-1 text-center text-[10px] leading-5 text-slate-700">
-          Explanation generated from source code and repository context.
+        {/* Data Flow */}
+        <Section title="Information flow">
+          <p className="whitespace-pre-line font-mono text-[12.5px] leading-6 text-slate-300">
+            {explanation.dataFlow}
+          </p>
+        </Section>
+
+        {/* Callers & Dependencies */}
+        <Section title="Dependencies & callers">
+          {explanation.usedBy.length > 0 ? (
+            <ul className="space-y-1.5">
+              {explanation.usedBy.map((item, index) => (
+                <li key={`${item}-${index}`} className="flex items-center gap-2 text-[12.5px] text-slate-300">
+                  <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-600" />
+                  <span className="break-all font-mono">{item}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-[13px] italic text-slate-500">
+              No caller information identified from the repository index.
+            </p>
+          )}
+        </Section>
+
+        {/* Key Concepts */}
+        <Section title="Important concepts">
+          {explanation.keyConcepts.length > 0 ? (
+            <div className="divide-y divide-white/[0.06] border-t border-white/[0.06]">
+              {explanation.keyConcepts.map((concept, index) => (
+                <details key={`${concept.name}-${index}`} className="group py-2.5">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+                    <span className="text-[13px] font-medium text-slate-200">
+                      {concept.name}
+                    </span>
+                    <ChevronDown className="h-4 w-4 shrink-0 text-slate-600 transition-transform group-open:rotate-180" />
+                  </summary>
+
+                  <p className="mt-2 text-[13px] leading-5 text-slate-400">
+                    {concept.explanation}
+                  </p>
+                </details>
+              ))}
+            </div>
+          ) : (
+            <EmptyValue />
+          )}
+        </Section>
+
+        {/* Limitations & Uncertainty */}
+        <Section title="Limitations & uncertainty" icon={<AlertTriangle className="h-3.5 w-3.5 text-amber-400" />}>
+          {explanation.uncertainty.length > 0 ? (
+            <ul className="space-y-2">
+              {explanation.uncertainty.map((item, index) => (
+                <li key={`${item}-${index}`} className="text-[13px] leading-5 text-amber-200/80">
+                  {item}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-[13px] text-emerald-400/80">
+              High confidence. No significant ambiguities identified.
+            </p>
+          )}
+        </Section>
+
+        <p className="pt-2 text-center text-[11px] text-slate-600">
+          Generated from repository AST and context.
         </p>
       </div>
     </div>
   );
 }
 
-/* ------------------------------------------------------------------
-   Supporting components
-------------------------------------------------------------------- */
-
-function SectionHeading({
-  icon,
+function Section({
   title,
-}: {
-  icon: ReactNode;
-  title: string;
-}) {
-  return (
-    <div className="flex items-center gap-2 px-1">
-      <span className="text-slate-500">{icon}</span>
-
-      <h2 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-        {title}
-      </h2>
-    </div>
-  );
-}
-
-function SectionBlock({
   icon,
-  title,
   children,
-  className = "",
 }: {
-  icon: ReactNode;
   title: string;
+  icon?: ReactNode;
   children: ReactNode;
-  className?: string;
 }) {
   return (
-    <section className={className}>
-      <SectionHeading
-        icon={icon}
-        title={title}
-      />
-
-      <div className="mt-2">
-        {children}
+    <section>
+      <div className="mb-3 flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+        {icon}
+        {title}
       </div>
+      {children}
     </section>
   );
 }
 
-function InsightCard({
-  title,
-  value,
-  icon,
-}: {
-  title: string;
-  value: string;
-  icon: ReactNode;
-}) {
+function CodeSnippet({ code, startLine }: { code: string; startLine?: number }) {
+  const lines = code.split(/\r?\n/);
+  const firstLine = startLine ?? 1;
+
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-white/[0.018] p-3">
-      <div className="flex items-center gap-2 text-slate-600">
-        {icon}
+    <div className="max-h-[280px] overflow-auto bg-[#07080B]">
+      <pre className="min-w-max py-2 font-mono text-[11px] leading-5">
+        {lines.map((line, index) => {
+          const lineNumber = firstLine + index;
 
-        <span className="text-[9px] font-semibold uppercase tracking-[0.12em]">
-          {title}
-        </span>
-      </div>
-
-      <p className="mt-2 text-[12px] leading-5 text-slate-300">
-        {value}
-      </p>
+          return (
+            <div key={`${lineNumber}-${index}`} className="grid grid-cols-[38px_1fr] px-3.5">
+              <span className="select-none pr-3 text-right text-slate-600">{lineNumber}</span>
+              <code className="whitespace-pre text-slate-300">{line || "\u00A0"}</code>
+            </div>
+          );
+        })}
+      </pre>
     </div>
   );
 }
 
 function EmptyValue() {
-  return (
-    <div className="rounded-xl border border-dashed border-white/[0.06] px-3 py-3">
-      <p className="text-[12px] leading-5 text-slate-600">
-        No information was identified for this section.
-      </p>
-    </div>
-  );
+  return <p className="text-[13px] italic text-slate-500">No information available for this section.</p>;
 }

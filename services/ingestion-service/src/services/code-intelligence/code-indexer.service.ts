@@ -1,9 +1,26 @@
 import { detectLanguage } from "./language-registry.js";
 
 import {
+  indexDataModels,
+} from "./data-model/data-model-indexer.js";
+
+import {
+  resolveDataModelRelationships,
+} from "./data-model/data-model-resolver.js";
+
+import {
   parseSource,
+  parseSourceAst,
   type ParsedFile,
 } from "./tree-sitter-parser.js";
+
+import {
+  resolveDataAccessRelationships,
+} from "./data-access-resolver.js";
+
+import {
+  getLanguageAnalyzer,
+} from "./languages/index.js";
 
 import {
   normalizeImports,
@@ -13,6 +30,18 @@ import {
   resolveImports,
   buildResolvedRelationships,
 } from "./import-resolver.js";
+
+import {
+  resolveSymbolRelationships,
+} from "./relationship-resolver.js";
+
+import {
+  extractJavaScriptRoutes,
+} from "./route-extractor.js";
+
+import {
+  resolveRouteRelationships,
+} from "./route-resolver.js";
 
 import type {
   CodeIndex,
@@ -53,14 +82,17 @@ function normalizeSymbolKind(
   kind: string,
   insideClass: boolean,
 ): CodeSymbolKind {
-  const normalized = kind.toLowerCase();
+  const normalized =
+    kind.toLowerCase();
 
   switch (normalized) {
     case "class":
       return "class";
 
     case "function":
-      return insideClass ? "method" : "function";
+      return insideClass
+        ? "method"
+        : "function";
 
     case "method":
       return "method";
@@ -86,6 +118,9 @@ function normalizeSymbolKind(
     case "constant":
       return "constant";
 
+    case "route":
+      return "route";
+
     default:
       return "unknown";
   }
@@ -98,6 +133,81 @@ function isRawStructureItem(
     typeof value === "object" &&
     value !== null
   );
+}
+
+function symbolKey(
+  symbol: CodeSymbol,
+): string {
+  return [
+    symbol.filePath,
+    symbol.kind,
+    symbol.name,
+    symbol.startLine,
+    symbol.endLine,
+  ].join("|");
+}
+
+function relationshipKey(
+  relationship: CodeRelationship,
+): string {
+  return [
+    relationship.source,
+    relationship.target,
+    relationship.kind,
+    relationship.evidence?.filePath ?? "",
+    relationship.evidence?.startLine ?? "",
+  ].join("|");
+}
+
+function addUniqueSymbols(
+  target: CodeSymbol[],
+  symbols: CodeSymbol[],
+): void {
+  const seen =
+    new Set(
+      target.map(symbolKey),
+    );
+
+  for (const symbol of symbols) {
+    const key =
+      symbolKey(symbol);
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    target.push(symbol);
+  }
+}
+
+function addUniqueRelationships(
+  target: CodeRelationship[],
+  relationships: CodeRelationship[],
+): void {
+  const seen =
+    new Set(
+      target.map(
+        relationshipKey,
+      ),
+    );
+
+  for (const relationship of relationships) {
+    const key =
+      relationshipKey(
+        relationship,
+      );
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+
+    target.push(
+      relationship,
+    );
+  }
 }
 
 function flattenStructure(
@@ -113,44 +223,73 @@ function flattenStructure(
       continue;
     }
 
-    const name = item.name;
+    const name =
+      item.name;
 
     if (!name) {
       continue;
     }
 
-    const rawKind = getKindName(item.kind);
+    const rawKind =
+      getKindName(
+        item.kind,
+      );
 
-    const symbolKind = normalizeSymbolKind(
-      rawKind,
-      parentKind?.toLowerCase() === "class",
-    );
+    const symbolKind =
+      normalizeSymbolKind(
+        rawKind,
+        parentKind?.toLowerCase() ===
+          "class",
+      );
 
-    const startLine = item.span?.startLine ?? 0;
+    const startLine =
+      item.span?.startLine ?? 0;
 
     const endLine =
-      item.span?.endLine ?? startLine;
+      item.span?.endLine ??
+      startLine;
 
     const symbolId =
       `${repositoryId}:${filePath}:${symbolKind}:${name}:${startLine}`;
 
-    symbols.push({
+    const symbol: CodeSymbol = {
       id: symbolId,
       name,
       kind: symbolKind,
       filePath,
       startLine,
       endLine,
-      signature: item.signature,
-    });
+      signature:
+        item.signature,
+    };
 
-    relationships.push({
-      source: filePath,
-      target: symbolId,
-      kind: "defines",
-    });
+    addUniqueSymbols(
+      symbols,
+      [symbol],
+    );
 
-    if (Array.isArray(item.children)) {
+    addUniqueRelationships(
+      relationships,
+      [
+        {
+          source: filePath,
+          target: symbolId,
+          kind: "defines",
+          confidence: 1,
+          evidence: {
+            filePath,
+            startLine,
+            endLine,
+          },
+        },
+      ],
+    );
+
+    if (
+      Array.isArray(
+        item.children,
+      )
+    ) {
       flattenStructure(
         item.children,
         filePath,
@@ -163,6 +302,16 @@ function flattenStructure(
   }
 }
 
+function isJavaScriptFamily(
+  language: string,
+): boolean {
+  return (
+    language === "javascript" ||
+    language === "typescript" ||
+    language === "tsx"
+  );
+}
+
 export function indexRepositoryFiles(
   repositoryId: string,
   files: RepositorySourceFile[],
@@ -172,18 +321,14 @@ export function indexRepositoryFiles(
     files: [],
     symbols: [],
     relationships: [],
+    dataModels: [],
   };
 
-  /*
-   * Phase 1:
-   *
-   * Parse every supported source file and build
-   * the normalized file + symbol index.
-   */
   for (const file of files) {
-    const language = detectLanguage(
-      file.filePath,
-    );
+    const language =
+      detectLanguage(
+        file.filePath,
+      );
 
     if (!language) {
       continue;
@@ -192,23 +337,28 @@ export function indexRepositoryFiles(
     let parsed: ParsedFile;
 
     try {
-      parsed = parseSource(
-        file.content,
-        language,
-      );
+      parsed =
+        parseSource(
+          file.content,
+          language,
+        );
     } catch {
       continue;
     }
 
-    const imports = normalizeImports(
-      parsed.language,
-      parsed.imports,
-    );
+    const imports =
+      normalizeImports(
+        parsed.language,
+        parsed.imports,
+        file.content,
+      );
 
     index.files.push({
       path: file.filePath,
-      language: parsed.language,
-      lineCount: parsed.metrics.totalLines,
+      language:
+        parsed.language,
+      lineCount:
+        parsed.metrics.totalLines,
       imports,
     });
 
@@ -219,14 +369,177 @@ export function indexRepositoryFiles(
       index.symbols,
       index.relationships,
     );
+
+    try {
+      const ast =
+        parseSourceAst(
+          file.content,
+          language,
+        );
+
+      const analyzer =
+        getLanguageAnalyzer(
+          parsed.language,
+        );
+
+      if (analyzer) {
+        const analyzerRelationships =
+          analyzer.extractRelationships({
+            filePath:
+              file.filePath,
+            source:
+              file.content,
+            tree:
+              ast.tree,
+            symbols:
+              index.symbols.filter(
+                (symbol) =>
+                  symbol.filePath ===
+                  file.filePath,
+              ),
+          });
+
+        addUniqueRelationships(
+          index.relationships,
+          analyzerRelationships,
+        );
+      }
+
+      if (
+        isJavaScriptFamily(
+          parsed.language,
+        )
+      ) {
+        const routeResult =
+          extractJavaScriptRoutes({
+            repositoryId,
+            filePath:
+              file.filePath,
+            source:
+              file.content,
+            tree:
+              ast.tree,
+          });
+
+        addUniqueSymbols(
+          index.symbols,
+          routeResult.symbols,
+        );
+
+        addUniqueRelationships(
+          index.relationships,
+          routeResult.relationships,
+        );
+      }
+    } catch {
+      continue;
+    }
   }
+
+  const dataModelIndex =
+    indexDataModels(
+      repositoryId,
+      files,
+    );
+
+  addUniqueSymbols(
+    index.symbols,
+    dataModelIndex.symbols,
+  );
+
+  index.dataModels =
+    dataModelIndex.models;
 
   const resolvedImports =
     resolveImports(index);
-  index.relationships.push(
-    ...buildResolvedRelationships(
+
+  const importRelationships =
+    buildResolvedRelationships(
       resolvedImports,
-    ),
+    );
+
+  addUniqueRelationships(
+    index.relationships,
+    importRelationships,
+  );
+
+  const dataAccessRelationships =
+    resolveDataAccessRelationships(
+      index,
+    );
+
+  index.relationships =
+    index.relationships.filter(
+      (relationship) =>
+        relationship.kind !==
+          "queries" &&
+        relationship.kind !==
+          "writes" &&
+        relationship.kind !==
+          "reads" &&
+        relationship.kind !==
+          "instantiates",
+    );
+
+  addUniqueRelationships(
+    index.relationships,
+    dataAccessRelationships,
+  );
+
+  const symbolRelationships =
+    resolveSymbolRelationships(
+      index,
+    );
+
+  index.relationships =
+    symbolRelationships.relationships;
+
+  const routeRelationships =
+    resolveRouteRelationships(
+      index,
+    );
+
+  const routeKeys =
+    new Set(
+      routeRelationships.map(
+        relationshipKey,
+      ),
+    );
+
+  index.relationships =
+    index.relationships.filter(
+      (relationship) => {
+        if (
+          relationship.kind !==
+            "routes_to" &&
+          relationship.kind !==
+            "handles"
+        ) {
+          return true;
+        }
+
+        return routeKeys.has(
+          relationshipKey(
+            relationship,
+          ),
+        );
+      },
+    );
+
+  addUniqueRelationships(
+    index.relationships,
+    routeRelationships,
+  );
+
+  const dataModelRelationships =
+    resolveDataModelRelationships(
+      index,
+      dataModelIndex.relationships,
+    );
+
+  addUniqueRelationships(
+    index.relationships,
+    dataModelRelationships,
   );
 
   return index;

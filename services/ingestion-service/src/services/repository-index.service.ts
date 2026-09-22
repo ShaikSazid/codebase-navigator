@@ -2,6 +2,7 @@ import type {
   DependencyEdge,
   FileNode,
   RepoFileIndex,
+  RepositoryRelationship,
   RepositorySymbol,
 } from "../types/repo.js";
 
@@ -19,6 +20,7 @@ export interface RepositoryFileContext {
   dependencies: string[];
   usedBy: string[];
   symbols: RepositorySymbol[];
+  relationships: RepositoryRelationship[];
 }
 
 export function buildRepositoryIndex(
@@ -28,51 +30,63 @@ export function buildRepositoryIndex(
     content: string;
   }>,
 ): RepoFileIndex {
-  /*
-   * Convert the existing repository file shape
-   * into the code-intelligence input shape.
-   */
-  const codeIndex = indexRepositoryFiles(
-    repositoryIndex,
-    files.map((file) => ({
-      filePath: file.path,
-      content: file.content,
-    })),
-  );
+  const codeIndex =
+    indexRepositoryFiles(
+      repositoryIndex,
+      files.map(
+        (file) => ({
+          filePath:
+            file.path,
+          content:
+            file.content,
+        }),
+      ),
+    );
 
-  /*
-   * Quick lookup for language metadata.
-   */
-  const languageByFile = new Map<
-    string,
-    string
-  >();
+  const languageByFile =
+    new Map<
+      string,
+      string
+    >();
 
-  for (const file of codeIndex.files) {
+  for (
+    const file of
+      codeIndex.files
+  ) {
     languageByFile.set(
       file.path,
       file.language,
     );
   }
 
-  /*
-   * Quick lookup for symbols defined in each file.
-   */
-  const symbolsByFile = new Map<
-    string,
-    RepositorySymbol[]
-  >();
+  const symbolsByFile =
+    new Map<
+      string,
+      RepositorySymbol[]
+    >();
 
-  for (const symbol of codeIndex.symbols) {
+  for (
+    const symbol of
+      codeIndex.symbols
+  ) {
     const symbols =
-      symbolsByFile.get(symbol.filePath) ?? [];
+      symbolsByFile.get(
+        symbol.filePath,
+      ) ?? [];
 
     symbols.push({
-      name: symbol.name,
-      kind: symbol.kind,
-      startLine: symbol.startLine,
-      endLine: symbol.endLine,
-      signature: symbol.signature,
+      name:
+        symbol.name,
+      kind:
+        symbol.kind,
+      startLine:
+        symbol.startLine,
+      endLine:
+        symbol.endLine,
+      signature:
+        symbol.signature,
+      routePaths:
+        symbol.routePaths,
     });
 
     symbolsByFile.set(
@@ -81,18 +95,16 @@ export function buildRepositoryIndex(
     );
   }
 
-  /*
-   * Store normalized imports on each file.
-   *
-   * This includes the raw module specifier,
-   * not only successfully resolved internal files.
-   */
-  const importsByFile = new Map<
-    string,
-    string[]
-  >();
+  const importsByFile =
+    new Map<
+      string,
+      string[]
+    >();
 
-  for (const file of codeIndex.files) {
+  for (
+    const file of
+      codeIndex.files
+  ) {
     importsByFile.set(
       file.path,
       unique(
@@ -104,29 +116,60 @@ export function buildRepositoryIndex(
     );
   }
 
-  const fileNodes: FileNode[] = files.map(
-    (file) => ({
-      path: file.path,
+  const fileNodes:
+    FileNode[] =
+    files.map(
+      (file) => ({
+        path:
+          file.path,
 
-      imports:
-        importsByFile.get(file.path) ?? [],
+        imports:
+          importsByFile.get(
+            file.path,
+          ) ?? [],
 
-      language:
-        languageByFile.get(file.path),
+        language:
+          languageByFile.get(
+            file.path,
+          ),
 
-      symbols:
-        symbolsByFile.get(file.path) ?? [],
-    }),
-  );
+        symbols:
+          symbolsByFile.get(
+            file.path,
+          ) ?? [],
+      }),
+    );
+
   const dependencyEdges =
     buildDependencyEdges(
       codeIndex.relationships,
     );
 
+  const relationships:
+    RepositoryRelationship[] =
+    codeIndex.relationships.map(
+      (relationship) => ({
+        source:
+          relationship.source,
+        target:
+          relationship.target,
+        kind:
+          relationship.kind,
+        confidence:
+          relationship.confidence,
+        evidence:
+          relationship.evidence,
+      }),
+    );
+
   return {
     repositoryIndex,
-    files: fileNodes,
+    files:
+      fileNodes,
     dependencyEdges,
+    relationships,
+    dataModels:
+      codeIndex.dataModels,
   };
 }
 
@@ -136,36 +179,62 @@ export function getRepositoryFileContext(
 ): RepositoryFileContext | null {
   const fileNode =
     repositoryIndex.files.find(
-      (file) => file.path === filePath,
+      (file) =>
+        file.path ===
+        filePath,
     );
 
   if (!fileNode) {
     return null;
   }
 
-  const dependencies = unique(
-    repositoryIndex.dependencyEdges
-      .filter(
-        (edge: DependencyEdge) =>
-          edge.source === filePath,
-      )
-      .map(
-        (edge: DependencyEdge) =>
-          edge.target,
-      ),
-  );
+  const dependencies =
+    unique(
+      repositoryIndex.dependencyEdges
+        .filter(
+          (
+            edge: DependencyEdge,
+          ) =>
+            edge.source ===
+            filePath,
+        )
+        .map(
+          (
+            edge: DependencyEdge,
+          ) =>
+            edge.target,
+        ),
+    );
 
-  const usedBy = unique(
-    repositoryIndex.dependencyEdges
-      .filter(
-        (edge: DependencyEdge) =>
-          edge.target === filePath,
-      )
-      .map(
-        (edge: DependencyEdge) =>
-          edge.source,
-      ),
-  );
+  const usedBy =
+    unique(
+      repositoryIndex.dependencyEdges
+        .filter(
+          (
+            edge: DependencyEdge,
+          ) =>
+            edge.target ===
+            filePath,
+        )
+        .map(
+          (
+            edge: DependencyEdge,
+          ) =>
+            edge.source,
+        ),
+    );
+
+  const relationships =
+    (
+      repositoryIndex
+        .relationships ?? []
+    ).filter(
+      (relationship) =>
+        relationship.source ===
+          filePath ||
+        relationship.target ===
+          filePath,
+    );
 
   return {
     filePath,
@@ -179,33 +248,49 @@ export function getRepositoryFileContext(
 
     symbols:
       fileNode.symbols ?? [],
+
+    relationships,
   };
 }
 
 function buildDependencyEdges(
-  relationships: CodeRelationship[],
+  relationships:
+    CodeRelationship[],
 ): DependencyEdge[] {
-  const seen = new Set<string>();
+  const seen =
+    new Set<string>();
 
-  const edges: DependencyEdge[] = [];
+  const edges:
+    DependencyEdge[] =
+    [];
 
-  for (const relationship of relationships) {
-    if (relationship.kind !== "imports") {
+  for (
+    const relationship of
+      relationships
+  ) {
+    if (
+      relationship.kind !==
+      "imports"
+    ) {
       continue;
     }
 
     const key =
       `${relationship.source}->${relationship.target}`;
 
-    if (seen.has(key)) {
+    if (
+      seen.has(key)
+    ) {
       continue;
     }
 
     seen.add(key);
 
     edges.push({
-      source: relationship.source,
-      target: relationship.target,
+      source:
+        relationship.source,
+      target:
+        relationship.target,
     });
   }
 
@@ -216,6 +301,8 @@ function unique(
   values: string[],
 ): string[] {
   return [
-    ...new Set(values),
+    ...new Set(
+      values,
+    ),
   ];
 }

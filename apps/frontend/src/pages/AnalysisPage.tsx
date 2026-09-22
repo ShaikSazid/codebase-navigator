@@ -5,7 +5,10 @@ import {
   useState,
 } from "react";
 
-import { useLocation, useParams } from "react-router-dom";
+import {
+  useLocation,
+  useParams,
+} from "react-router-dom";
 
 import {
   getRepositoryStatus,
@@ -22,6 +25,7 @@ import {
 
 import RepositoryTree from "../components/RepositoryTree";
 import ExplanationPanel from "../components/ExplanationPanel";
+import QAChat from "../components/QAChat";
 
 import {
   Brain,
@@ -29,7 +33,10 @@ import {
   PanelRightClose,
 } from "lucide-react";
 
-type Tab = "overview" | "architecture";
+type Tab =
+  | "overview"
+  | "architecture"
+  | "qa";
 
 interface Comet {
   x: number;
@@ -48,7 +55,10 @@ interface Galaxy {
   angle: number;
   rotationSpeed: number;
   opacity: number;
-  fadeState: "fadeIn" | "active" | "fadeOut";
+  fadeState:
+    | "fadeIn"
+    | "active"
+    | "fadeOut";
   color: string;
 }
 
@@ -57,7 +67,9 @@ const MIN_EXPLANATION_PANEL_WIDTH = 320;
 const MAX_EXPLANATION_PANEL_WIDTH = 700;
 
 export default function AnalysisPage() {
-  const { jobId } = useParams<{ jobId: string }>();
+  const { jobId } =
+    useParams<{ jobId: string }>();
+
   const location = useLocation();
 
   const repositoryUrl =
@@ -65,47 +77,81 @@ export default function AnalysisPage() {
       location.state as {
         repositoryUrl?: string;
       } | null
-    )?.repositoryUrl ?? "Unknown repository";
+    )?.repositoryUrl ??
+    "Unknown repository";
 
-  const repositoryLabel = repositoryUrl
-    .replace(/^https?:\/\//, "")
-    .replace(/\.git$/, "");
+  const repositoryLabel =
+    repositoryUrl
+      .replace(/^https?:\/\//, "")
+      .replace(/\.git$/, "");
 
-  const [architectureMap, setArchitectureMap] =
-    useState<ArchitectureMap | null>(null);
+  const [
+    architectureMap,
+    setArchitectureMap,
+  ] = useState<ArchitectureMap | null>(
+    null,
+  );
 
-  const [repositoryTree, setRepositoryTree] =
-    useState<RepositoryTreeNode | null>(null);
+  const [
+    repositoryTree,
+    setRepositoryTree,
+  ] = useState<RepositoryTreeNode | null>(
+    null,
+  );
 
-  const [selectedFile, setSelectedFile] =
-    useState<RepositoryFile | null>(null);
+  const [
+    selectedFile,
+    setSelectedFile,
+  ] = useState<RepositoryFile | null>(
+    null,
+  );
 
-  const [isFileLoading, setIsFileLoading] =
-    useState(false);
+  const [
+    isFileLoading,
+    setIsFileLoading,
+  ] = useState(false);
 
-  const [fileExplanation, setFileExplanation] =
-    useState<FileExplanation | null>(null);
+  const [
+    fileExplanation,
+    setFileExplanation,
+  ] = useState<FileExplanation | null>(
+    null,
+  );
 
-  const [isExplanationLoading, setIsExplanationLoading] =
-    useState(false);
+  const [
+    isExplanationLoading,
+    setIsExplanationLoading,
+  ] = useState(false);
 
-  const [explanationError, setExplanationError] =
-    useState<string | null>(null);
+  const [
+    explanationError,
+    setExplanationError,
+  ] = useState<string | null>(null);
 
-  const [isExplanationOpen, setIsExplanationOpen] =
-    useState(false);
+  const [
+    isExplanationOpen,
+    setIsExplanationOpen,
+  ] = useState(false);
 
-  const [explanationPanelWidth, setExplanationPanelWidth] =
-    useState(DEFAULT_EXPLANATION_PANEL_WIDTH);
+  const [
+    explanationPanelWidth,
+    setExplanationPanelWidth,
+  ] = useState(
+    DEFAULT_EXPLANATION_PANEL_WIDTH,
+  );
 
-  const [isResizingExplanation, setIsResizingExplanation] =
-    useState(false);
+  const [
+    isResizingExplanation,
+    setIsResizingExplanation,
+  ] = useState(false);
 
   const resizeStartXRef =
     useRef(0);
 
   const resizeStartWidthRef =
-    useRef(DEFAULT_EXPLANATION_PANEL_WIDTH);
+    useRef(
+      DEFAULT_EXPLANATION_PANEL_WIDTH,
+    );
 
   const [isLoading, setIsLoading] =
     useState(true);
@@ -116,36 +162,48 @@ export default function AnalysisPage() {
   const [tab, setTab] =
     useState<Tab>("overview");
 
-  /* ---------------- Dynamic Minimal Starfield & Rare Cosmic Events ---------------- */
+  /* ------------------------------------------------------------------------ */
+  /* Dynamic Minimal Starfield & Rare Cosmic Events                          */
+  /* ------------------------------------------------------------------------ */
 
   const canvasRef =
-    useRef<HTMLCanvasElement | null>(null);
+    useRef<HTMLCanvasElement | null>(
+      null,
+    );
 
   useEffect(() => {
-    const canvas = canvasRef.current;
+    const canvas =
+      canvasRef.current;
 
-    if (!canvas) return;
+    if (!canvas) {
+      return;
+    }
 
-    const ctx = canvas.getContext("2d");
+    const ctx =
+      canvas.getContext("2d");
 
-    if (!ctx) return;
+    if (!ctx) {
+      return;
+    }
 
     let animationFrameId: number;
 
     let width =
-      (canvas.width = window.innerWidth);
+      (canvas.width =
+        window.innerWidth);
 
     let height =
-      (canvas.height = window.innerHeight);
+      (canvas.height =
+        window.innerHeight);
 
     const handleResize = () => {
-      if (!canvas) return;
-
       width =
-        canvas.width = window.innerWidth;
+        canvas.width =
+          window.innerWidth;
 
       height =
-        canvas.height = window.innerHeight;
+        canvas.height =
+          window.innerHeight;
     };
 
     window.addEventListener(
@@ -153,16 +211,17 @@ export default function AnalysisPage() {
       handleResize,
     );
 
-    // 1. Minimal Stars
-
     const numStars = 25;
 
     const stars = Array.from(
-      { length: numStars },
+      {
+        length: numStars,
+      },
       () => ({
         x: Math.random() * width,
         y: Math.random() * height,
-        size: Math.random() * 1.2 + 0.3,
+        size:
+          Math.random() * 1.2 + 0.3,
         speedY:
           Math.random() * 0.12 + 0.02,
         speedX:
@@ -174,19 +233,19 @@ export default function AnalysisPage() {
       }),
     );
 
-    // Active cosmic objects
+    let activeComet:
+      | Comet
+      | null = null;
 
-    let activeComet: Comet | null =
-      null;
-
-    let activeGalaxy: Galaxy | null =
-      null;
-
-    // Helper: Trigger Comet
+    let activeGalaxy:
+      | Galaxy
+      | null = null;
 
     const spawnComet = () => {
       const side =
-        Math.floor(Math.random() * 4);
+        Math.floor(
+          Math.random() * 4,
+        );
 
       let startX = 0;
       let startY = 0;
@@ -194,7 +253,9 @@ export default function AnalysisPage() {
       let vy = 0;
 
       if (side === 0) {
-        startX = Math.random() * width;
+        startX =
+          Math.random() * width;
+
         startY = -50;
 
         vx =
@@ -203,7 +264,8 @@ export default function AnalysisPage() {
         vy =
           Math.random() * 4 + 4;
       } else if (side === 1) {
-        startX = width + 50;
+        startX =
+          width + 50;
 
         startY =
           Math.random() * height;
@@ -217,7 +279,8 @@ export default function AnalysisPage() {
         startX =
           Math.random() * width;
 
-        startY = height + 50;
+        startY =
+          height + 50;
 
         vx =
           (Math.random() - 0.5) * 6;
@@ -249,8 +312,6 @@ export default function AnalysisPage() {
         opacity: 1,
       };
     };
-
-    // Helper: Trigger Spiral Galaxy Nebula
 
     const spawnGalaxy = () => {
       const colors = [
@@ -292,8 +353,6 @@ export default function AnalysisPage() {
       };
     };
 
-    // Cosmic Event Timer
-
     const eventInterval =
       setInterval(() => {
         if (Math.random() > 0.4) {
@@ -303,8 +362,6 @@ export default function AnalysisPage() {
         }
       }, 75000);
 
-    // Render Loop
-
     const render = () => {
       ctx.clearRect(
         0,
@@ -312,8 +369,6 @@ export default function AnalysisPage() {
         width,
         height,
       );
-
-      // Deep Space Canvas Gradient
 
       const spaceGradient =
         ctx.createLinearGradient(
@@ -348,8 +403,6 @@ export default function AnalysisPage() {
         height,
       );
 
-      // Draw stars
-
       for (const star of stars) {
         star.y -= star.speedY;
 
@@ -368,11 +421,13 @@ export default function AnalysisPage() {
             Math.random() * width;
         }
 
-        if (star.x < 0)
+        if (star.x < 0) {
           star.x = width;
+        }
 
-        if (star.x > width)
+        if (star.x > width) {
           star.x = 0;
+        }
 
         ctx.beginPath();
 
@@ -395,10 +450,9 @@ export default function AnalysisPage() {
         ctx.fill();
       }
 
-      // Galaxy
-
       if (activeGalaxy) {
-        const g = activeGalaxy;
+        const g =
+          activeGalaxy;
 
         if (
           g.fadeState ===
@@ -407,7 +461,8 @@ export default function AnalysisPage() {
           g.opacity += 0.003;
 
           if (g.opacity >= 0.35) {
-            g.fadeState = "active";
+            g.fadeState =
+              "active";
           }
         } else if (
           g.fadeState ===
@@ -423,10 +478,7 @@ export default function AnalysisPage() {
             g.fadeState =
               "fadeOut";
           }
-        } else if (
-          g.fadeState ===
-          "fadeOut"
-        ) {
+        } else {
           g.opacity -= 0.002;
 
           if (g.opacity <= 0) {
@@ -442,7 +494,9 @@ export default function AnalysisPage() {
             g.y,
           );
 
-          ctx.rotate(g.angle);
+          ctx.rotate(
+            g.angle,
+          );
 
           const galaxyGradient =
             ctx.createRadialGradient(
@@ -493,10 +547,9 @@ export default function AnalysisPage() {
         }
       }
 
-      // Comet
-
       if (activeComet) {
-        const c = activeComet;
+        const c =
+          activeComet;
 
         c.x += c.speedX;
         c.y += c.speedY;
@@ -509,12 +562,14 @@ export default function AnalysisPage() {
 
         const tailX =
           c.x -
-          (c.speedX / magnitude) *
+          (c.speedX /
+            magnitude) *
             c.length;
 
         const tailY =
           c.y -
-          (c.speedY / magnitude) *
+          (c.speedY /
+            magnitude) *
             c.length;
 
         const cometGradient =
@@ -552,7 +607,8 @@ export default function AnalysisPage() {
           tailY,
         );
 
-        ctx.lineWidth = c.size;
+        ctx.lineWidth =
+          c.size;
 
         ctx.strokeStyle =
           cometGradient;
@@ -600,7 +656,9 @@ export default function AnalysisPage() {
     };
   }, []);
 
-  /* ---------------- Load Repository Analysis ---------------- */
+  /* ------------------------------------------------------------------------ */
+  /* Load Repository Analysis                                                */
+  /* ------------------------------------------------------------------------ */
 
   useEffect(() => {
     if (!jobId) {
@@ -613,7 +671,8 @@ export default function AnalysisPage() {
       return;
     }
 
-    const analysisJobId = jobId;
+    const analysisJobId =
+      jobId;
 
     async function loadAnalysis() {
       try {
@@ -668,10 +727,12 @@ export default function AnalysisPage() {
       }
     }
 
-    loadAnalysis();
+    void loadAnalysis();
   }, [jobId]);
 
-  /* ---------------- Resize AI Explanation Panel ---------------- */
+  /* ------------------------------------------------------------------------ */
+  /* Resize AI Explanation Panel                                              */
+  /* ------------------------------------------------------------------------ */
 
   const handleResizeMove =
     useCallback(
@@ -785,7 +846,9 @@ export default function AnalysisPage() {
     handleResizeEnd,
   ]);
 
-  /* ---------------- Build Explainer Context ---------------- */
+  /* ------------------------------------------------------------------------ */
+  /* Build Explainer Context                                                  */
+  /* ------------------------------------------------------------------------ */
 
   const buildRepositoryContext =
     useCallback(
@@ -843,7 +906,9 @@ export default function AnalysisPage() {
       [architectureMap],
     );
 
-  /* ---------------- File Selection ---------------- */
+  /* ------------------------------------------------------------------------ */
+  /* File Selection                                                           */
+  /* ------------------------------------------------------------------------ */
 
   const handleFileSelect =
     useCallback(
@@ -861,10 +926,6 @@ export default function AnalysisPage() {
         try {
           setIsFileLoading(true);
 
-          /*
-           * Selecting a file only loads the source.
-           * It does NOT automatically call the Explainer.
-           */
           setSelectedFile(null);
 
           setFileExplanation(null);
@@ -894,24 +955,23 @@ export default function AnalysisPage() {
       [jobId],
     );
 
-  /* ---------------- Explain Selected File ---------------- */
+  /* ------------------------------------------------------------------------ */
+  /* Explain Selected File                                                    */
+  /* ------------------------------------------------------------------------ */
 
   const handleExplainFile =
     useCallback(async () => {
-     if (!selectedFile || !jobId) {
-  return;
-}
+      if (
+        !selectedFile ||
+        !jobId
+      ) {
+        return;
+      }
 
-      /*
-       * Open the panel immediately so the user
-       * gets instant visual feedback.
-       */
-      setIsExplanationOpen(true);
+      setIsExplanationOpen(
+        true,
+      );
 
-      /*
-       * If this file has already been explained,
-       * do not make another Gemini request.
-       */
       if (fileExplanation) {
         return;
       }
@@ -921,19 +981,24 @@ export default function AnalysisPage() {
           true,
         );
 
-        setExplanationError(null);
+        setExplanationError(
+          null,
+        );
 
         const repositoryContext =
           buildRepositoryContext(
             selectedFile.path,
           );
 
-        const explanation = await explainFile({
-  repositoryId: jobId,
-  filePath: selectedFile.path,
-  content: selectedFile.content,
-  repositoryContext,
-});
+        const explanation =
+          await explainFile({
+            repositoryId: jobId,
+            filePath:
+              selectedFile.path,
+            content:
+              selectedFile.content,
+            repositoryContext,
+          });
 
         setFileExplanation(
           explanation,
@@ -956,9 +1021,12 @@ export default function AnalysisPage() {
       selectedFile,
       fileExplanation,
       buildRepositoryContext,
+      jobId,
     ]);
 
-  /* ---------------- Toggle Explanation Panel ---------------- */
+  /* ------------------------------------------------------------------------ */
+  /* Toggle Explanation Panel                                                 */
+  /* ------------------------------------------------------------------------ */
 
   const handleExplanationToggle =
     useCallback(() => {
@@ -986,10 +1054,10 @@ export default function AnalysisPage() {
           0,
         )
       : architectureMap?.type ===
-        "importance-ranked"
-      ? architectureMap.rankedFiles
-          .length
-      : 0;
+          "importance-ranked"
+        ? architectureMap.rankedFiles
+            .length
+        : 0;
 
   return (
     <main
@@ -1016,7 +1084,7 @@ export default function AnalysisPage() {
                 analysis · {jobId}
               </p>
 
-              <h1 className="mt-0.5 truncate text-[17px] font-medium text-white tracking-tight">
+              <h1 className="mt-0.5 truncate text-[17px] font-medium tracking-tight text-white">
                 {repositoryLabel}
               </h1>
             </div>
@@ -1027,6 +1095,7 @@ export default function AnalysisPage() {
                   [
                     "overview",
                     "architecture",
+                    "qa",
                   ] as Tab[]
                 ).map((t) => (
                   <button
@@ -1041,7 +1110,9 @@ export default function AnalysisPage() {
                         : "text-slate-400 hover:text-white"
                     }`}
                   >
-                    {t}
+                    {t === "qa"
+                      ? "Q&A"
+                      : t}
                   </button>
                 ))}
               </nav>
@@ -1053,7 +1124,8 @@ export default function AnalysisPage() {
 
         <div
           className={
-            tab === "architecture"
+            tab === "architecture" ||
+            tab === "qa"
               ? "w-full flex-1 px-4 py-4"
               : "mx-auto flex w-full max-w-[1200px] flex-1 px-6 py-8"
           }
@@ -1127,9 +1199,7 @@ export default function AnalysisPage() {
                     "structured" ? (
                       <div className="mt-8 space-y-3">
                         {architectureMap.layers.map(
-                          (
-                            layer,
-                          ) => (
+                          (layer) => (
                             <div
                               key={
                                 layer.name
@@ -1171,9 +1241,7 @@ export default function AnalysisPage() {
                     ) : (
                       <div className="mt-8 space-y-3">
                         {architectureMap.rankedFiles.map(
-                          (
-                            file,
-                          ) => (
+                          (file) => (
                             <div
                               key={
                                 file.path
@@ -1251,8 +1319,6 @@ export default function AnalysisPage() {
                           </div>
                         ) : selectedFile ? (
                           <div className="flex h-full flex-col">
-                            {/* File Header */}
-
                             <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/[0.08] px-5 py-3">
                               <div className="min-w-0">
                                 <p className="font-mono text-[11px] text-slate-500">
@@ -1270,8 +1336,6 @@ export default function AnalysisPage() {
                                   }
                                 </p>
                               </div>
-
-                              {/* Explain Toggle */}
 
                               <button
                                 type="button"
@@ -1301,8 +1365,6 @@ export default function AnalysisPage() {
                               </button>
                             </div>
 
-                            {/* Source Code */}
-
                             <div className="custom-scrollbar flex-1 overflow-auto">
                               <pre className="min-h-full px-5 py-5 font-mono text-[12px] leading-6 text-slate-300">
                                 <code>
@@ -1320,10 +1382,7 @@ export default function AnalysisPage() {
                             </p>
 
                             <p className="mt-2 max-w-sm text-[12px] leading-5 text-slate-600">
-                              Choose a file from
-                              the repository
-                              tree to inspect
-                              its source code.
+                              Choose a file from the repository tree to inspect its source code.
                             </p>
                           </div>
                         )}
@@ -1355,8 +1414,7 @@ export default function AnalysisPage() {
                           <div
                             className="shrink-0 overflow-hidden rounded-r-xl border border-white/[0.08] border-l-0 bg-[#08090D]"
                             style={{
-                              width:
-                                `${explanationPanelWidth}px`,
+                              width: `${explanationPanelWidth}px`,
                             }}
                           >
                             <ExplanationPanel
@@ -1375,6 +1433,22 @@ export default function AnalysisPage() {
                       )}
                     </div>
                   </div>
+                )}
+
+                {/* Q&A Tab */}
+
+                {tab === "qa" && (
+                  <QAChat
+                    repositoryId={
+                      jobId ?? ""
+                    }
+                    repositoryTree={
+                      repositoryTree
+                    }
+                    onSelectFile={
+                      handleFileSelect
+                    }
+                  />
                 )}
               </>
             )}

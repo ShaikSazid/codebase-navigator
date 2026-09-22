@@ -1,37 +1,102 @@
+import { QdrantClient } from "@qdrant/js-client-rest";
+
 import { generateEmbedding } from "./embedding.service.js";
-import { getCodeCollection } from "./vector-store.service.js";
 
 export interface CodeSearchResult {
-    chunkId: string;
-    filePath: string;
-    content: string;
-    startLine: number;
-    endLine: number;
-    distance: number;
+  chunkId: string;
+  filePath: string;
+  content: string;
+  startLine: number;
+  endLine: number;
+  distance: number;
 }
 
-export async function searchCode(query: string, repositoryId: string, limit = 5): Promise<CodeSearchResult[]> {
-    const queryEmbedding = await generateEmbedding(query);
-    const collection = await getCodeCollection();
-    const result = await collection.query({
-        queryEmbeddings: [queryEmbedding],
-        nResults: limit,
-        where: { repositoryId },
-        include: ["documents", "metadatas", "distances"],
-    });
-    const documents = result.documents?.[0] ?? [];
-    const metadatas = result.metadatas?.[0] ?? [];
-    const distances = result.distances?.[0] ?? [];
-    const ids = result.ids?.[0] ?? [];
-    return documents.map((document, index) => {
-        const metadata = metadatas[index];
-        return {
-            chunkId: ids[index],
-            filePath: String(metadata?.filePath ?? ""),
-            content: document ?? "",
-            startLine: Number(metadata?.startLine ?? 0),
-            endLine: Number(metadata?.endLine ?? 0),
-            distance: distances[index] ?? 0,
-        };
-    });
+const client = new QdrantClient({
+  url:
+    process.env.QDRANT_URL ||
+    "http://localhost:6333",
+
+  apiKey:
+    process.env.QDRANT_API_KEY,
+});
+
+const COLLECTION_NAME =
+  "codebase_chunks_384";
+
+export async function searchCode(
+  query: string,
+  repositoryId: string,
+  limit = 5,
+): Promise<CodeSearchResult[]> {
+  const queryEmbedding =
+    await generateEmbedding(query);
+
+  const result =
+    await client.query(
+      COLLECTION_NAME,
+      {
+        query:
+          queryEmbedding,
+
+        limit,
+
+        filter: {
+          must: [
+            {
+              key: "repositoryId",
+              match: {
+                value:
+                  repositoryId,
+              },
+            },
+          ],
+        },
+
+        with_payload: true,
+
+        with_vector: false,
+      },
+    );
+
+  return result.points.map(
+    (point) => {
+      const payload =
+        point.payload ?? {};
+
+      return {
+        chunkId:
+          String(point.id),
+
+        filePath:
+          String(
+            payload.filePath ??
+              "",
+          ),
+
+        content:
+          String(
+            payload.content ??
+              "",
+          ),
+
+        startLine:
+          Number(
+            payload.startLine ??
+              0,
+          ),
+
+        endLine:
+          Number(
+            payload.endLine ??
+              0,
+          ),
+
+        distance:
+          1 -
+          Number(
+            point.score ?? 0,
+          ),
+      };
+    },
+  );
 }

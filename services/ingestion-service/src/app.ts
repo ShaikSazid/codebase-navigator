@@ -4,6 +4,7 @@ import {
   getRepositoryFile,
   getRepositoryFileContext,
   ingestRepository,
+  getRepositoryIndex
 } from "./services/ingestion.service.js";
 
 const app = express();
@@ -44,6 +45,27 @@ app.post("/internal/ingest", async (req, res) => {
     });
   }
 });
+
+app.get(
+  "/internal/repository-index/:repositoryId",
+  (req, res) => {
+    const repositoryIndex =
+      getRepositoryIndex(
+        req.params.repositoryId,
+      );
+
+    if (!repositoryIndex) {
+      return res.status(404).json({
+        message:
+          "Repository index not found",
+      });
+    }
+
+    return res.status(200).json({
+      repositoryIndex,
+    });
+  },
+);
 
 app.get(
   "/internal/repositories/:repositoryId/files",

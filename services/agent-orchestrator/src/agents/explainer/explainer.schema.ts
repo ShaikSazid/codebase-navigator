@@ -12,11 +12,15 @@ export const FileExplanationSchema = z.object({
   ),
 
   keyFunctions: z.array(
-    z.object({
-      name: z.string().min(1),
-      explanation: z.string().min(1),
-    }),
-  ),
+  z.object({
+    name: z.string().min(1),
+    explanation: z.string().min(1),
+    kind: z.string().optional(),
+    startLine: z.number().int().nonnegative().optional(),
+    endLine: z.number().int().nonnegative().optional(),
+    code: z.string().optional(),
+  }),
+),
 
   dataFlow: z.string().min(1),
 

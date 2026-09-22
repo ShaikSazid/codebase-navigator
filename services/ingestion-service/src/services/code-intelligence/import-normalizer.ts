@@ -1,4 +1,5 @@
 import type {
+  ImportBinding,
   NormalizedImport,
 } from "./indexer.types.js";
 
@@ -13,6 +14,10 @@ interface RawImport {
   alias?: string;
   isWildcard?: boolean;
   span?: RawSpan;
+  bindings?: Array<{
+    importedName: string;
+    localName: string;
+  }>;
 }
 
 function isRawImport(
@@ -22,6 +27,17 @@ function isRawImport(
     typeof value === "object" &&
     value !== null
   );
+}
+
+function getSpan(
+  importInfo: RawImport,
+) {
+  return {
+    startLine:
+      importInfo.span?.startLine,
+    endLine:
+      importInfo.span?.endLine,
+  };
 }
 
 function cleanJavaScriptModuleSpecifier(
@@ -35,11 +51,158 @@ function cleanJavaScriptModuleSpecifier(
     return fromMatch[1];
   }
 
-  const sideEffectMatch = source.match(
-    /^\s*import\s+["']([^"']+)["']/,
+  const sideEffectMatch =
+    source.match(
+      /^\s*import\s+["']([^"']+)["']/,
+    );
+
+  return (
+    sideEffectMatch?.[1] ??
+    null
+  );
+}
+
+function extractJavaScriptBindings(
+  source: string,
+  importedNames: string[],
+  alias?: string,
+  isWildcard = false,
+): ImportBinding[] {
+  const fromMatch = source.match(
+    /\bfrom\s+["'][^"']+["']/,
   );
 
-  return sideEffectMatch?.[1] ?? null;
+  if (
+    !fromMatch ||
+    fromMatch.index === undefined
+  ) {
+    return [];
+  }
+
+  const importClause = source
+    .slice(0, fromMatch.index)
+    .replace(
+      /^\s*import\s+/,
+      "",
+    )
+    .trim();
+
+  if (!importClause) {
+    return [];
+  }
+
+  const bindings: ImportBinding[] =
+    [];
+
+  const namespaceMatch =
+    importClause.match(
+      /^\*\s+as\s+([A-Za-z_$][\w$]*)$/,
+    );
+
+  if (namespaceMatch?.[1]) {
+    return [
+      {
+        importedName: "*",
+        localName:
+          namespaceMatch[1],
+      },
+    ];
+  }
+
+  const namedMatch =
+    importClause.match(
+      /\{([\s\S]*)\}/,
+    );
+
+  if (namedMatch?.[1]) {
+    for (
+      const rawItem of
+        namedMatch[1].split(",")
+    ) {
+      const item = rawItem
+        .trim()
+        .replace(
+          /^type\s+/,
+          "",
+        );
+
+      if (!item) {
+        continue;
+      }
+
+      const aliasMatch =
+        item.match(
+          /^(.+?)\s+as\s+(.+)$/,
+        );
+
+      if (
+        aliasMatch?.[1] &&
+        aliasMatch[2]
+      ) {
+        bindings.push({
+          importedName:
+            aliasMatch[1].trim(),
+          localName:
+            aliasMatch[2].trim(),
+        });
+      } else {
+        bindings.push({
+          importedName: item,
+          localName: item,
+        });
+      }
+    }
+  }
+
+  const beforeNamed =
+    importClause
+      .split("{")[0]
+      ?.trim();
+
+  if (beforeNamed) {
+    const defaultPart =
+      beforeNamed
+        .split(",")[0]
+        ?.trim();
+
+    if (
+      defaultPart &&
+      !defaultPart.startsWith("*") &&
+      !defaultPart.startsWith("{")
+    ) {
+      bindings.unshift({
+        importedName: "default",
+        localName: defaultPart,
+      });
+    }
+  }
+
+  if (
+    bindings.length === 0 &&
+    importedNames.length > 0
+  ) {
+    for (
+      const name of importedNames
+    ) {
+      bindings.push({
+        importedName: name,
+        localName: name,
+      });
+    }
+  }
+
+  if (
+    bindings.length === 0 &&
+    alias &&
+    isWildcard
+  ) {
+    bindings.push({
+      importedName: "*",
+      localName: alias,
+    });
+  }
+
+  return bindings;
 }
 
 function normalizeJavaScriptImport(
@@ -47,6 +210,32 @@ function normalizeJavaScriptImport(
 ): NormalizedImport | null {
   if (!importInfo.source) {
     return null;
+  }
+
+  const requireMatch =
+    importInfo.source.match(
+      /require\s*\(\s*["']([^"']+)["']\s*\)/,
+    );
+
+  if (requireMatch?.[1]) {
+    const moduleSpecifier =
+      requireMatch[1];
+
+    return {
+      raw: importInfo.source,
+      moduleSpecifier,
+      importedNames:
+        importInfo.items ?? [],
+      alias:
+        importInfo.alias,
+      isWildcard: false,
+      bindings:
+        importInfo.bindings ?? [],
+      startLine:
+        importInfo.span?.startLine,
+      endLine:
+        importInfo.span?.endLine,
+    };
   }
 
   const moduleSpecifier =
@@ -58,15 +247,68 @@ function normalizeJavaScriptImport(
     return null;
   }
 
+  const bindings =
+    importInfo.bindings ?? [];
+
   return {
     raw: importInfo.source,
     moduleSpecifier,
-    importedNames: importInfo.items ?? [],
-    alias: importInfo.alias,
-    isWildcard: importInfo.isWildcard ?? false,
-    startLine: importInfo.span?.startLine,
-    endLine: importInfo.span?.endLine,
+    importedNames:
+      importInfo.items ?? [],
+    alias:
+      importInfo.alias,
+    isWildcard:
+      importInfo.isWildcard ?? false,
+    bindings,
+    startLine:
+      importInfo.span?.startLine,
+    endLine:
+      importInfo.span?.endLine,
   };
+}
+
+function parsePythonBindings(
+  importedPart: string,
+): ImportBinding[] {
+  const bindings: ImportBinding[] =
+    [];
+
+  for (
+    const rawItem of importedPart
+      .replace(/[()]/g, "")
+      .split(",")
+  ) {
+    const item =
+      rawItem.trim();
+
+    if (!item) {
+      continue;
+    }
+
+    const aliasMatch =
+      item.match(
+        /^(.+?)\s+as\s+(.+)$/,
+      );
+
+    if (
+      aliasMatch?.[1] &&
+      aliasMatch[2]
+    ) {
+      bindings.push({
+        importedName:
+          aliasMatch[1].trim(),
+        localName:
+          aliasMatch[2].trim(),
+      });
+    } else {
+      bindings.push({
+        importedName: item,
+        localName: item,
+      });
+    }
+  }
+
+  return bindings;
 }
 
 function normalizePythonImport(
@@ -76,118 +318,94 @@ function normalizePythonImport(
     return [];
   }
 
-  /*
-   * Tree-sitter can return multiline Python imports
-   * as a single source string.
-   *
-   * Normalize whitespace first so both:
-   *
-   * from app.services import UserService
-   *
-   * and:
-   *
-   * from app.services import (
-   *     UserService,
-   *     OtherService,
-   * )
-   *
-   * are handled consistently.
-   */
-  const source = importInfo.source
-    .replace(/\s+/g, " ")
-    .trim();
+  const source =
+    importInfo.source
+      .replace(/\s+/g, " ")
+      .trim();
 
   if (source.startsWith("from ")) {
-    const match = source.match(
-      /^from\s+(.+?)\s+import\s+(.+)$/,
-    );
+    const match =
+      source.match(
+        /^from\s+(.+?)\s+import\s+(.+)$/,
+      );
 
-    if (!match) {
+    if (
+      !match?.[1] ||
+      !match[2]
+    ) {
       return [];
     }
 
-    const moduleSpecifier =
-      match[1].trim();
-
-    const importedPart =
-      match[2]
-        .replace(/[()]/g, "")
-        .trim();
-
-    const importedNames =
-      importInfo.items &&
-      importInfo.items.length > 0
-        ? importInfo.items
-        : importedPart
-            .split(",")
-            .map((item) => {
-              const cleaned =
-                item.trim();
-
-              const aliasIndex =
-                cleaned.indexOf(" as ");
-
-              if (aliasIndex !== -1) {
-                return cleaned
-                  .slice(0, aliasIndex)
-                  .trim();
-              }
-
-              return cleaned;
-            })
-            .filter(Boolean);
+    const bindings =
+      parsePythonBindings(
+        match[2].trim(),
+      );
 
     return [
       {
         raw: importInfo.source,
-        moduleSpecifier,
-        importedNames,
+        moduleSpecifier:
+          match[1].trim(),
+        importedNames:
+          bindings.map(
+            (binding) =>
+              binding.importedName,
+          ),
         alias: importInfo.alias,
         isWildcard:
           importInfo.isWildcard ??
-          importedNames.includes("*"),
-        startLine:
-          importInfo.span?.startLine,
-        endLine:
-          importInfo.span?.endLine,
+          match[2].trim() === "*",
+        bindings,
+        ...getSpan(importInfo),
       },
     ];
   }
 
   if (source.startsWith("import ")) {
-    const importedPart = source
-      .slice("import ".length)
-      .trim();
+    const modules =
+      source
+        .slice("import ".length)
+        .trim()
+        .split(",")
+        .map(
+          (item) => item.trim(),
+        )
+        .filter(Boolean);
 
-    const modules = importedPart
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
+    return modules.map(
+      (modulePart) => {
+        const aliasMatch =
+          modulePart.match(
+            /^(.+?)\s+as\s+(.+)$/,
+          );
 
-    return modules.map((modulePart) => {
-      const aliasMatch = modulePart.match(
-        /^(.+?)\s+as\s+(.+)$/,
-      );
+        const moduleSpecifier =
+          aliasMatch?.[1]?.trim() ??
+          modulePart;
 
-      const moduleSpecifier =
-        aliasMatch?.[1]?.trim() ??
-        modulePart;
+        const localName =
+          aliasMatch?.[2]?.trim() ??
+          moduleSpecifier
+            .split(".")
+            .pop() ??
+          moduleSpecifier;
 
-      const alias =
-        aliasMatch?.[2]?.trim();
-
-      return {
-        raw: importInfo.source!,
-        moduleSpecifier,
-        importedNames: [],
-        alias,
-        isWildcard: false,
-        startLine:
-          importInfo.span?.startLine,
-        endLine:
-          importInfo.span?.endLine,
-      };
-    });
+        return {
+          raw: importInfo.source!,
+          moduleSpecifier,
+          importedNames: [],
+          alias: localName,
+          isWildcard: true,
+          bindings: [
+            {
+              importedName: "*",
+              localName,
+            },
+          ],
+          ...getSpan(importInfo),
+        };
+      },
+    );
   }
 
   return [];
@@ -200,23 +418,51 @@ function normalizeGoImport(
     return null;
   }
 
+  const source =
+    importInfo.source.trim();
+
+  const match =
+    source.match(
+      /^(?:(\w+)\s+)?["']([^"']+)["']$/,
+    );
+
   const moduleSpecifier =
-    importInfo.source
-      .trim()
-      .replace(/^["']|["']$/g, "");
+    match?.[2] ??
+    source
+      .replace(
+        /^import\s+/,
+        "",
+      )
+      .replace(
+        /^["']|["']$/g,
+        "",
+      )
+      .trim();
 
   if (!moduleSpecifier) {
     return null;
   }
 
+  const localName =
+    match?.[1] ??
+    moduleSpecifier
+      .split("/")
+      .pop() ??
+    moduleSpecifier;
+
   return {
     raw: importInfo.source,
     moduleSpecifier,
     importedNames: [],
-    alias: importInfo.alias,
-    isWildcard: false,
-    startLine: importInfo.span?.startLine,
-    endLine: importInfo.span?.endLine,
+    alias: localName,
+    isWildcard: true,
+    bindings: [
+      {
+        importedName: "*",
+        localName,
+      },
+    ],
+    ...getSpan(importInfo),
   };
 }
 
@@ -227,27 +473,49 @@ function normalizeJavaImport(
     return null;
   }
 
-  const moduleSpecifier =
+  const source =
     importInfo.source
       .trim()
-      .replace(/^import\s+/, "")
-      .replace(/^static\s+/, "")
-      .replace(/;$/, "")
+      .replace(
+        /^import\s+/,
+        "",
+      )
+      .replace(
+        /^static\s+/,
+        "",
+      )
+      .replace(
+        /;$/,
+        "",
+      )
       .trim();
 
-  if (!moduleSpecifier) {
+  if (!source) {
     return null;
   }
 
+  const parts =
+    source.split(".");
+
+  const importedName =
+    parts.pop() ?? source;
+
   return {
     raw: importInfo.source,
-    moduleSpecifier,
-    importedNames: [],
-    alias: importInfo.alias,
+    moduleSpecifier: source,
+    importedNames: [
+      importedName,
+    ],
+    alias: importedName,
     isWildcard:
-      moduleSpecifier.endsWith(".*"),
-    startLine: importInfo.span?.startLine,
-    endLine: importInfo.span?.endLine,
+      importedName === "*",
+    bindings: [
+      {
+        importedName,
+        localName: importedName,
+      },
+    ],
+    ...getSpan(importInfo),
   };
 }
 
@@ -258,41 +526,167 @@ function normalizeRustImport(
     return null;
   }
 
-  const moduleSpecifier =
+  const source =
     importInfo.source
       .trim()
-      .replace(/^use\s+/, "")
-      .replace(/;$/, "")
+      .replace(
+        /^use\s+/,
+        "",
+      )
+      .replace(
+        /;$/,
+        "",
+      )
       .trim();
 
-  if (!moduleSpecifier) {
+  if (!source) {
     return null;
   }
+
+  const aliasMatch =
+    source.match(
+      /(.+?)\s+as\s+(.+)$/,
+    );
+
+  const moduleSpecifier =
+    aliasMatch?.[1]?.trim() ??
+    source;
+
+  const pathParts =
+    moduleSpecifier
+      .split("::")
+      .filter(Boolean);
+
+  const importedName =
+    pathParts.pop() ??
+    moduleSpecifier;
+
+  const localName =
+    aliasMatch?.[2]?.trim() ??
+    importedName;
 
   return {
     raw: importInfo.source,
     moduleSpecifier,
-    importedNames: importInfo.items ?? [],
-    alias: importInfo.alias,
+    importedNames: [
+      importedName,
+    ],
+    alias: localName,
     isWildcard:
-      importInfo.isWildcard ??
-      moduleSpecifier.includes("*"),
-    startLine: importInfo.span?.startLine,
-    endLine: importInfo.span?.endLine,
+      importedName === "*",
+    bindings: [
+      {
+        importedName:
+          importedName === "*"
+            ? "*"
+            : importedName,
+        localName,
+      },
+    ],
+    ...getSpan(importInfo),
   };
+}
+
+function extractCSharpImports(
+  source: string,
+): NormalizedImport[] {
+  const imports: NormalizedImport[] =
+    [];
+
+  const pattern =
+    /^\s*using\s+(?:static\s+)?([^;=]+?)(?:\s*=\s*([^;]+))?\s*;/gm;
+
+  for (
+    const match of source.matchAll(
+      pattern,
+    )
+  ) {
+    const moduleSpecifier =
+      match[1]?.trim();
+
+    if (!moduleSpecifier) {
+      continue;
+    }
+
+    const alias =
+      match[2]?.trim() ??
+      moduleSpecifier
+        .split(".")
+        .pop() ??
+      moduleSpecifier;
+
+    imports.push({
+      raw: match[0].trim(),
+      moduleSpecifier,
+      importedNames: [],
+      alias,
+      isWildcard: true,
+      bindings: [
+        {
+          importedName: "*",
+          localName: alias,
+        },
+      ],
+    });
+  }
+
+  return imports;
+}
+
+function extractRubyImports(
+  source: string,
+): NormalizedImport[] {
+  const imports: NormalizedImport[] =
+    [];
+
+  const pattern =
+    /^\s*(?:require_relative|require)\s+["']([^"']+)["']/gm;
+
+  for (
+    const match of source.matchAll(
+      pattern,
+    )
+  ) {
+    const moduleSpecifier =
+      match[1]?.trim();
+
+    if (!moduleSpecifier) {
+      continue;
+    }
+
+    imports.push({
+      raw: match[0].trim(),
+      moduleSpecifier,
+      importedNames: [],
+      isWildcard: true,
+      bindings: [
+        {
+          importedName: "*",
+          localName: "",
+        },
+      ],
+    });
+  }
+
+  return imports;
 }
 
 export function normalizeImports(
   language: string,
   rawImports: unknown[],
+  source?: string,
 ): NormalizedImport[] {
-  const imports = rawImports.filter(
-    isRawImport,
-  );
+  const imports =
+    rawImports.filter(
+      isRawImport,
+    );
 
-  const normalized: NormalizedImport[] = [];
+  const normalized:
+    NormalizedImport[] = [];
 
-  for (const importInfo of imports) {
+  for (
+    const importInfo of imports
+  ) {
     switch (language) {
       case "javascript":
       case "typescript":
@@ -309,15 +703,13 @@ export function normalizeImports(
         break;
       }
 
-      case "python": {
+      case "python":
         normalized.push(
           ...normalizePythonImport(
             importInfo,
           ),
         );
-
         break;
-      }
 
       case "go": {
         const result =
@@ -358,12 +750,39 @@ export function normalizeImports(
         break;
       }
 
+      case "csharp":
+        break;
+
+      case "ruby":
+        break;
+
       default:
-        // Languages for which the current
-        // parser output does not expose
-        // imports are intentionally ignored.
         break;
     }
+  }
+
+  if (
+    source &&
+    language === "csharp" &&
+    normalized.length === 0
+  ) {
+    normalized.push(
+      ...extractCSharpImports(
+        source,
+      ),
+    );
+  }
+
+  if (
+    source &&
+    language === "ruby" &&
+    normalized.length === 0
+  ) {
+    normalized.push(
+      ...extractRubyImports(
+        source,
+      ),
+    );
   }
 
   return normalized;

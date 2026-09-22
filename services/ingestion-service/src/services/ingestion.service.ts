@@ -132,6 +132,16 @@ export async function ingestRepository(
   }
 }
 
+export function getRepositoryIndex(
+  repositoryId: string,
+): RepoFileIndex | null {
+  return (
+    repositoryIndexes.get(
+      repositoryId,
+    ) ?? null
+  );
+}
+
 
 export function getRepositoryFile(
   repositoryId: string,

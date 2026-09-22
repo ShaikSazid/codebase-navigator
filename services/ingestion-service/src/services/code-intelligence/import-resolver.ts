@@ -50,7 +50,9 @@ function resolveJavaScriptImport(
   moduleSpecifier: string,
   filePaths: Set<string>,
 ): string | null {
-  if (!moduleSpecifier.startsWith(".")) {
+  if (
+    !moduleSpecifier.startsWith(".")
+  ) {
     return null;
   }
 
@@ -59,35 +61,96 @@ function resolveJavaScriptImport(
       normalizePath(sourceFile),
     );
 
-  const basePath = normalizePath(
-    path.posix.join(
-      importerDirectory,
-      moduleSpecifier,
-    ),
-  );
+  const rawBasePath =
+    normalizePath(
+      path.posix.join(
+        importerDirectory,
+        moduleSpecifier,
+      ),
+    );
 
-  // Exact path.
-  if (fileExists(filePaths, basePath)) {
-    return basePath;
+  const extension =
+    path.posix.extname(
+      rawBasePath,
+    );
+
+  const sourceExtensions =
+    new Set([
+      ".js",
+      ".jsx",
+      ".mjs",
+      ".cjs",
+      ".ts",
+      ".tsx",
+    ]);
+
+  const basePaths = [
+    rawBasePath,
+  ];
+
+  if (
+    sourceExtensions.has(
+      extension,
+    )
+  ) {
+    basePaths.push(
+      rawBasePath.slice(
+        0,
+        -extension.length,
+      ),
+    );
   }
 
-  // Try normal JavaScript/TypeScript extensions.
-  for (const extension of JS_EXTENSIONS) {
-    const candidate =
-      `${basePath}${extension}`;
-
-    if (fileExists(filePaths, candidate)) {
-      return candidate;
+  for (
+    const basePath of basePaths
+  ) {
+    if (
+      fileExists(
+        filePaths,
+        basePath,
+      )
+    ) {
+      return normalizePath(
+        basePath,
+      );
     }
-  }
 
-  // Try index files.
-  for (const extension of JS_EXTENSIONS) {
-    const candidate =
-      `${basePath}/index${extension}`;
+    for (
+      const candidateExtension
+        of JS_EXTENSIONS
+    ) {
+      const candidate =
+        `${basePath}${candidateExtension}`;
 
-    if (fileExists(filePaths, candidate)) {
-      return candidate;
+      if (
+        fileExists(
+          filePaths,
+          candidate,
+        )
+      ) {
+        return normalizePath(
+          candidate,
+        );
+      }
+    }
+
+    for (
+      const candidateExtension
+        of JS_EXTENSIONS
+    ) {
+      const candidate =
+        `${basePath}/index${candidateExtension}`;
+
+      if (
+        fileExists(
+          filePaths,
+          candidate,
+        )
+      ) {
+        return normalizePath(
+          candidate,
+        );
+      }
     }
   }
 
@@ -107,93 +170,102 @@ function resolvePythonImport(
     return null;
   }
 
-  /*
-   * First try exact repository-root paths.
-   *
-   * Examples:
-   *   services.py
-   *   app/services.py
-   */
   const directCandidates = [
     `${cleanedSpecifier}.py`,
     `${cleanedSpecifier}/__init__.py`,
   ];
 
-  for (const candidate of directCandidates) {
-    if (fileExists(filePaths, candidate)) {
+  for (
+    const candidate of directCandidates
+  ) {
+    if (
+      fileExists(
+        filePaths,
+        candidate,
+      )
+    ) {
       return candidate;
     }
   }
 
-  /*
-   * Only perform suffix-based resolution for
-   * qualified module paths.
-   *
-   * Example:
-   *   app.services
-   *     ↓
-   *   backend/app/services.py
-   *
-   * We deliberately do NOT do this for:
-   *   logging
-   *   os
-   *   asyncio
-   *
-   * because these may be standard-library or
-   * installed third-party modules.
-   */
-  if (!cleanedSpecifier.includes("/")) {
-    return null;
-  }
+  const matches =
+    [...filePaths].filter(
+      (filePath) => {
+        const normalized =
+          normalizePath(
+            filePath,
+          );
 
-  for (const filePath of filePaths) {
-    const normalizedFile =
-      normalizePath(filePath);
+        return (
+          normalized.endsWith(
+            `/${cleanedSpecifier}.py`,
+          ) ||
+          normalized.endsWith(
+            `/${cleanedSpecifier}/__init__.py`,
+          )
+        );
+      },
+    );
 
-    if (
-      normalizedFile.endsWith(
-        `/${cleanedSpecifier}.py`,
-      ) ||
-      normalizedFile.endsWith(
-        `/${cleanedSpecifier}/__init__.py`,
-      )
-    ) {
-      return normalizedFile;
-    }
-  }
-
-  return null;
+  return matches.length === 1
+    ? matches[0] ?? null
+    : null;
 }
 
 function resolveJavaImport(
   moduleSpecifier: string,
   filePaths: Set<string>,
 ): string | null {
-  const cleanedSpecifier =
+  const cleaned =
     moduleSpecifier
-      .replace(/^import\s+/, "")
-      .replace(/^static\s+/, "")
-      .replace(/;$/, "")
+      .replace(
+        /^import\s+/,
+        "",
+      )
+      .replace(
+        /^static\s+/,
+        "",
+      )
+      .replace(
+        /;$/,
+        "",
+      )
       .trim();
 
-  const expectedPath =
-    `${cleanedSpecifier.replaceAll(".", "/")}.java`;
-
-  for (const filePath of filePaths) {
-    const normalizedFile =
-      normalizePath(filePath);
-
-    if (
-      normalizedFile === expectedPath ||
-      normalizedFile.endsWith(
-        `/${expectedPath}`,
-      )
-    ) {
-      return normalizedFile;
-    }
+  if (!cleaned) {
+    return null;
   }
 
-  return null;
+  const expectedPath =
+    `${cleaned.replaceAll(".", "/")}.java`;
+
+  if (
+    fileExists(
+      filePaths,
+      expectedPath,
+    )
+  ) {
+    return expectedPath;
+  }
+
+  const className =
+    cleaned
+      .split(".")
+      .pop() ??
+    cleaned;
+
+  const matches =
+    [...filePaths].filter(
+      (filePath) =>
+        path.posix.basename(
+          normalizePath(filePath),
+        ) ===
+        `${className}.java`,
+    );
+
+  return matches.length === 1
+    ? matches[0] ?? null
+    : null;
 }
 
 function resolveGoImport(
@@ -202,43 +274,42 @@ function resolveGoImport(
 ): string | null {
   const normalizedSpecifier =
     moduleSpecifier
-      .replace(/^["']|["']$/g, "")
+      .replace(
+        /^["']|["']$/g,
+        "",
+      )
       .trim();
 
   if (!normalizedSpecifier) {
     return null;
   }
 
-  /*
-   * Go imports refer to packages rather than
-   * individual files.
-   *
-   * We therefore look for a repository directory
-   * whose path corresponds to the imported package.
-   */
-  const packageTail =
+  const packageName =
     normalizedSpecifier
       .split("/")
-      .slice(-2)
-      .join("/");
+      .pop();
 
-  for (const filePath of filePaths) {
-    const normalizedFile =
-      normalizePath(filePath);
-
-    const directory =
-      path.posix.dirname(normalizedFile);
-
-    if (
-      directory.endsWith(
-        `/${packageTail}`,
-      )
-    ) {
-      return normalizedFile;
-    }
+  if (!packageName) {
+    return null;
   }
 
-  return null;
+  const matches =
+    [...filePaths].filter(
+      (filePath) =>
+        path.posix
+          .dirname(
+            normalizePath(
+              filePath,
+            ),
+          )
+          .endsWith(
+            `/${packageName}`,
+          ),
+    );
+
+  return matches.length === 1
+    ? matches[0] ?? null
+    : matches[0] ?? null;
 }
 
 function resolveRustImport(
@@ -255,7 +326,10 @@ function resolveRustImport(
 
   const parts =
     moduleSpecifier
-      .replace(/^crate::/, "")
+      .replace(
+        /^crate::/,
+        "",
+      )
       .split("::")
       .filter(Boolean);
 
@@ -263,43 +337,216 @@ function resolveRustImport(
     return null;
   }
 
-  const fullModulePath =
+  const directModule =
     parts.join("/");
 
   const directCandidates = [
-    `${fullModulePath}.rs`,
-    `${fullModulePath}/mod.rs`,
+    `${directModule}.rs`,
+    `${directModule}/mod.rs`,
   ];
 
-  for (const candidate of directCandidates) {
-    if (fileExists(filePaths, candidate)) {
+  for (
+    const candidate of directCandidates
+  ) {
+    if (
+      fileExists(
+        filePaths,
+        candidate,
+      )
+    ) {
       return candidate;
     }
   }
 
-  /*
-   * The last segment may be a symbol rather than
-   * a module. Try resolving the parent module.
-   */
-  if (parts.length > 1) {
-    const parentModulePath =
-      parts
-        .slice(0, -1)
-        .join("/");
+  const parentModule =
+    parts
+      .slice(0, -1)
+      .join("/");
 
+  if (parentModule) {
     const parentCandidates = [
-      `${parentModulePath}.rs`,
-      `${parentModulePath}/mod.rs`,
+      `${parentModule}.rs`,
+      `${parentModule}/mod.rs`,
     ];
 
-    for (const candidate of parentCandidates) {
-      if (fileExists(filePaths, candidate)) {
+    for (
+      const candidate
+        of parentCandidates
+    ) {
+      if (
+        fileExists(
+          filePaths,
+          candidate,
+        )
+      ) {
         return candidate;
+      }
+    }
+
+    const suffix =
+      parentCandidates.filter(
+        (candidate) =>
+          [...filePaths].some(
+            (filePath) =>
+              normalizePath(
+                filePath,
+              ).endsWith(
+                `/${candidate}`,
+              ),
+          ),
+      );
+
+    if (suffix.length === 1) {
+      const match =
+        [...filePaths].find(
+          (filePath) =>
+            normalizePath(
+              filePath,
+            ).endsWith(
+              `/${suffix[0]}`,
+            ),
+        );
+
+      if (match) {
+        return normalizePath(
+          match,
+        );
       }
     }
   }
 
   return null;
+}
+
+function resolveCSharpImport(
+  moduleSpecifier: string,
+  filePaths: Set<string>,
+): string | null {
+  const cleaned =
+    moduleSpecifier
+      .replace(
+        /^global::/,
+        "",
+      )
+      .replace(
+        /^using\s+/,
+        "",
+      )
+      .replace(
+        /;$/,
+        "",
+      )
+      .trim();
+
+  if (!cleaned) {
+    return null;
+  }
+
+  const directCandidates = [
+    `${cleaned.replaceAll(".", "/")}.cs`,
+    `${cleaned}.cs`,
+  ];
+
+  for (
+    const candidate of directCandidates
+  ) {
+    if (
+      fileExists(
+        filePaths,
+        candidate,
+      )
+    ) {
+      return candidate;
+    }
+  }
+
+  const name =
+    cleaned
+      .split(".")
+      .pop() ??
+    cleaned;
+
+  const matches =
+    [...filePaths].filter(
+      (filePath) =>
+        path.posix.basename(
+          normalizePath(filePath),
+        ) ===
+        `${name}.cs`,
+    );
+
+  return matches.length === 1
+    ? matches[0] ?? null
+    : null;
+}
+
+function resolveRubyImport(
+  sourceFile: string,
+  moduleSpecifier: string,
+  filePaths: Set<string>,
+): string | null {
+  const cleaned =
+    moduleSpecifier
+      .replace(
+        /\.rb$/,
+        "",
+      );
+
+  if (
+    cleaned.startsWith(".")
+  ) {
+    const directory =
+      path.posix.dirname(
+        normalizePath(sourceFile),
+      );
+
+    const base =
+      normalizePath(
+        path.posix.join(
+          directory,
+          cleaned,
+        ),
+      );
+
+    const candidates = [
+      `${base}.rb`,
+      `${base}/index.rb`,
+    ];
+
+    for (
+      const candidate of candidates
+    ) {
+      if (
+        fileExists(
+          filePaths,
+          candidate,
+        )
+      ) {
+        return candidate;
+      }
+    }
+
+    return null;
+  }
+
+  const name =
+    cleaned
+      .split("/")
+      .pop() ??
+    cleaned;
+
+  const matches =
+    [...filePaths].filter(
+      (filePath) =>
+        path.posix.basename(
+          normalizePath(filePath),
+          ".rb",
+        ) === name,
+    );
+
+  return matches.length === 1
+    ? matches[0] ?? null
+    : null;
 }
 
 function resolveInternalImport(
@@ -342,6 +589,19 @@ function resolveInternalImport(
         filePaths,
       );
 
+    case "csharp":
+      return resolveCSharpImport(
+        importInfo.moduleSpecifier,
+        filePaths,
+      );
+
+    case "ruby":
+      return resolveRubyImport(
+        sourceFile,
+        importInfo.moduleSpecifier,
+        filePaths,
+      );
+
     default:
       return null;
   }
@@ -355,10 +615,20 @@ function isDefinitelyInternal(
     case "javascript":
     case "typescript":
     case "tsx":
-      return moduleSpecifier.startsWith(".");
+    case "ruby":
+      return moduleSpecifier.startsWith(
+        ".",
+      );
+
+    case "python":
+      return moduleSpecifier.startsWith(
+        ".",
+      );
 
     case "rust":
-      return moduleSpecifier.startsWith("crate::");
+      return moduleSpecifier.startsWith(
+        "crate::",
+      );
 
     default:
       return false;
@@ -369,43 +639,42 @@ function isDefinitelyExternal(
   language: string,
   moduleSpecifier: string,
 ): boolean {
-  switch (language) {
-    case "rust":
-      return (
-        moduleSpecifier.startsWith("std::") ||
-        moduleSpecifier.startsWith("core::") ||
-        moduleSpecifier.startsWith("alloc::")
-      );
-
-    default:
-      return false;
-  }
+  return (
+    language === "rust" &&
+    (
+      moduleSpecifier.startsWith(
+        "std::",
+      ) ||
+      moduleSpecifier.startsWith(
+        "core::",
+      ) ||
+      moduleSpecifier.startsWith(
+        "alloc::",
+      )
+    )
+  );
 }
 
 export function resolveImports(
   index: CodeIndex,
 ): ResolvedImport[] {
-  const filePaths = new Set(
-    index.files.map(
-      (file) =>
-        normalizePath(file.path),
-    ),
-  );
+  const filePaths =
+    new Set(
+      index.files.map(
+        (file) =>
+          normalizePath(file.path),
+      ),
+    );
 
-  const results: ResolvedImport[] = [];
+  const results:
+    ResolvedImport[] = [];
 
-  for (const file of index.files) {
-    for (const importInfo of file.imports) {
-      const moduleSpecifier =
-        importInfo.moduleSpecifier;
-
-      /*
-       * First attempt repository resolution.
-       *
-       * This is important for languages such as
-       * Python and Java where an import may be
-       * internal even though it isn't relative.
-       */
+  for (
+    const file of index.files
+  ) {
+    for (
+      const importInfo of file.imports
+    ) {
       const targetFile =
         resolveInternalImport(
           file.path,
@@ -415,41 +684,42 @@ export function resolveImports(
         );
 
       if (targetFile) {
-  /*
-   * Never create a self-dependency.
-   *
-   * This can happen when a module resolver maps
-   * an import back to the file currently being
-   * analyzed.
-   */
-  if (normalizePath(targetFile) === normalizePath(file.path)) {
-    continue;
-  }
+        if (
+          normalizePath(
+            targetFile,
+          ) ===
+          normalizePath(
+            file.path,
+          )
+        ) {
+          continue;
+        }
 
-  results.push({
-    sourceFile: file.path,
-    moduleSpecifier,
-    targetFile,
-    status: "internal",
-    confidence: "high",
-  });
+        results.push({
+          sourceFile: file.path,
+          moduleSpecifier:
+            importInfo.moduleSpecifier,
+          targetFile:
+            normalizePath(
+              targetFile,
+            ),
+          status: "internal",
+          confidence: "high",
+        });
 
-  continue;
-}
+        continue;
+      }
 
-      /*
-       * Some languages have syntax that lets us
-       * confidently identify imports as external.
-       */
       if (
         isDefinitelyExternal(
           file.language,
-          moduleSpecifier,
+          importInfo.moduleSpecifier,
         )
       ) {
         results.push({
           sourceFile: file.path,
-          moduleSpecifier,
+          moduleSpecifier:
+            importInfo.moduleSpecifier,
           status: "external",
           confidence: "high",
         });
@@ -457,21 +727,16 @@ export function resolveImports(
         continue;
       }
 
-      /*
-       * JavaScript / TypeScript relative imports
-       * are definitely intended to reference the
-       * repository. If resolution failed, mark them
-       * unresolved instead of external.
-       */
       if (
         isDefinitelyInternal(
           file.language,
-          moduleSpecifier,
+          importInfo.moduleSpecifier,
         )
       ) {
         results.push({
           sourceFile: file.path,
-          moduleSpecifier,
+          moduleSpecifier:
+            importInfo.moduleSpecifier,
           status: "unresolved",
           confidence: "low",
         });
@@ -479,17 +744,10 @@ export function resolveImports(
         continue;
       }
 
-      /*
-       * For languages where imports can refer either
-       * to local packages or external dependencies,
-       * failure to resolve means external for now.
-       *
-       * Later, project metadata such as package
-       * manifests and build files will improve this.
-       */
       results.push({
         sourceFile: file.path,
-        moduleSpecifier,
+        moduleSpecifier:
+          importInfo.moduleSpecifier,
         status: "external",
         confidence: "medium",
       });
@@ -502,22 +760,21 @@ export function resolveImports(
 export function buildResolvedRelationships(
   resolvedImports: ResolvedImport[],
 ): CodeRelationship[] {
-  const relationships: CodeRelationship[] = [];
-
-  for (const resolved of resolvedImports) {
-    if (
-      resolved.status !== "internal" ||
-      !resolved.targetFile
-    ) {
-      continue;
-    }
-
-    relationships.push({
-      source: resolved.sourceFile,
-      target: resolved.targetFile,
-      kind: "imports",
-    });
-  }
-
-  return relationships;
+  return resolvedImports
+    .filter(
+      (resolved) =>
+        resolved.status === "internal" &&
+        Boolean(
+          resolved.targetFile,
+        ),
+    )
+    .map(
+      (resolved) => ({
+        source:
+          resolved.sourceFile,
+        target:
+          resolved.targetFile!,
+        kind: "imports",
+      }),
+    );
 }
