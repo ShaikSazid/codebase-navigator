@@ -5,9 +5,6 @@ import {
   ArrowRight,
   Brain,
   ChevronDown,
-  GitBranch,
-  ListChecks,
-  Network,
   Sparkles,
 } from "lucide-react";
 
