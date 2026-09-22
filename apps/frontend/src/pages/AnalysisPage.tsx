@@ -4,7 +4,11 @@ import {
   useRef,
   useState,
 } from "react";
-import { useLocation, useParams } from "react-router-dom";
+
+import {
+  useLocation,
+  useParams,
+} from "react-router-dom";
 
 import {
   getRepositoryStatus,
@@ -14,9 +18,25 @@ import {
   type RepositoryFile,
 } from "../lib/repository.api";
 
-import RepositoryTree from "../components/RepositoryTree";
+import {
+  explainFile,
+  type FileExplanation,
+} from "../lib/explainer.api";
 
-type Tab = "overview" | "architecture";
+import RepositoryTree from "../components/RepositoryTree";
+import ExplanationPanel from "../components/ExplanationPanel";
+import QAChat from "../components/QAChat";
+
+import {
+  Brain,
+  GripVertical,
+  PanelRightClose,
+} from "lucide-react";
+
+type Tab =
+  | "overview"
+  | "architecture"
+  | "qa";
 
 interface Comet {
   x: number;
@@ -35,12 +55,21 @@ interface Galaxy {
   angle: number;
   rotationSpeed: number;
   opacity: number;
-  fadeState: "fadeIn" | "active" | "fadeOut";
+  fadeState:
+    | "fadeIn"
+    | "active"
+    | "fadeOut";
   color: string;
 }
 
+const DEFAULT_EXPLANATION_PANEL_WIDTH = 420;
+const MIN_EXPLANATION_PANEL_WIDTH = 320;
+const MAX_EXPLANATION_PANEL_WIDTH = 700;
+
 export default function AnalysisPage() {
-  const { jobId } = useParams<{ jobId: string }>();
+  const { jobId } =
+    useParams<{ jobId: string }>();
+
   const location = useLocation();
 
   const repositoryUrl =
@@ -48,23 +77,81 @@ export default function AnalysisPage() {
       location.state as {
         repositoryUrl?: string;
       } | null
-    )?.repositoryUrl ?? "Unknown repository";
+    )?.repositoryUrl ??
+    "Unknown repository";
 
-  const repositoryLabel = repositoryUrl
-    .replace(/^https?:\/\//, "")
-    .replace(/\.git$/, "");
+  const repositoryLabel =
+    repositoryUrl
+      .replace(/^https?:\/\//, "")
+      .replace(/\.git$/, "");
 
-  const [architectureMap, setArchitectureMap] =
-    useState<ArchitectureMap | null>(null);
+  const [
+    architectureMap,
+    setArchitectureMap,
+  ] = useState<ArchitectureMap | null>(
+    null,
+  );
 
-  const [repositoryTree, setRepositoryTree] =
-    useState<RepositoryTreeNode | null>(null);
+  const [
+    repositoryTree,
+    setRepositoryTree,
+  ] = useState<RepositoryTreeNode | null>(
+    null,
+  );
 
-  const [selectedFile, setSelectedFile] =
-    useState<RepositoryFile | null>(null);
+  const [
+    selectedFile,
+    setSelectedFile,
+  ] = useState<RepositoryFile | null>(
+    null,
+  );
 
-  const [isFileLoading, setIsFileLoading] =
-    useState(false);
+  const [
+    isFileLoading,
+    setIsFileLoading,
+  ] = useState(false);
+
+  const [
+    fileExplanation,
+    setFileExplanation,
+  ] = useState<FileExplanation | null>(
+    null,
+  );
+
+  const [
+    isExplanationLoading,
+    setIsExplanationLoading,
+  ] = useState(false);
+
+  const [
+    explanationError,
+    setExplanationError,
+  ] = useState<string | null>(null);
+
+  const [
+    isExplanationOpen,
+    setIsExplanationOpen,
+  ] = useState(false);
+
+  const [
+    explanationPanelWidth,
+    setExplanationPanelWidth,
+  ] = useState(
+    DEFAULT_EXPLANATION_PANEL_WIDTH,
+  );
+
+  const [
+    isResizingExplanation,
+    setIsResizingExplanation,
+  ] = useState(false);
+
+  const resizeStartXRef =
+    useRef(0);
+
+  const resizeStartWidthRef =
+    useRef(
+      DEFAULT_EXPLANATION_PANEL_WIDTH,
+    );
 
   const [isLoading, setIsLoading] =
     useState(true);
@@ -75,53 +162,66 @@ export default function AnalysisPage() {
   const [tab, setTab] =
     useState<Tab>("overview");
 
-  /* ---------------- Dynamic Minimal Starfield & Rare Cosmic Events ---------------- */
+  /* ------------------------------------------------------------------------ */
+  /* Dynamic Minimal Starfield & Rare Cosmic Events                          */
+  /* ------------------------------------------------------------------------ */
 
   const canvasRef =
-    useRef<HTMLCanvasElement | null>(null);
+    useRef<HTMLCanvasElement | null>(
+      null,
+    );
 
   useEffect(() => {
-    const canvas = canvasRef.current;
+    const canvas =
+      canvasRef.current;
 
-    if (!canvas) return;
+    if (!canvas) {
+      return;
+    }
 
-    const ctx = canvas.getContext("2d");
+    const ctx =
+      canvas.getContext("2d");
 
-    if (!ctx) return;
+    if (!ctx) {
+      return;
+    }
 
     let animationFrameId: number;
 
     let width =
-      (canvas.width = window.innerWidth);
+      (canvas.width =
+        window.innerWidth);
 
     let height =
-      (canvas.height = window.innerHeight);
+      (canvas.height =
+        window.innerHeight);
 
     const handleResize = () => {
-      if (!canvas) return;
-
       width =
-        canvas.width = window.innerWidth;
+        canvas.width =
+          window.innerWidth;
 
       height =
-        canvas.height = window.innerHeight;
+        canvas.height =
+          window.innerHeight;
     };
 
     window.addEventListener(
       "resize",
-      handleResize
+      handleResize,
     );
-
-    // 1. Minimal Stars
 
     const numStars = 25;
 
     const stars = Array.from(
-      { length: numStars },
+      {
+        length: numStars,
+      },
       () => ({
         x: Math.random() * width,
         y: Math.random() * height,
-        size: Math.random() * 1.2 + 0.3,
+        size:
+          Math.random() * 1.2 + 0.3,
         speedY:
           Math.random() * 0.12 + 0.02,
         speedX:
@@ -130,22 +230,22 @@ export default function AnalysisPage() {
           Math.random() * 0.6 + 0.15,
         pulseSpeed:
           Math.random() * 0.015 + 0.003,
-      })
+      }),
     );
 
-    // Active cosmic objects
+    let activeComet:
+      | Comet
+      | null = null;
 
-    let activeComet: Comet | null =
-      null;
-
-    let activeGalaxy: Galaxy | null =
-      null;
-
-    // Helper: Trigger Comet
+    let activeGalaxy:
+      | Galaxy
+      | null = null;
 
     const spawnComet = () => {
       const side =
-        Math.floor(Math.random() * 4);
+        Math.floor(
+          Math.random() * 4,
+        );
 
       let startX = 0;
       let startY = 0;
@@ -153,7 +253,9 @@ export default function AnalysisPage() {
       let vy = 0;
 
       if (side === 0) {
-        startX = Math.random() * width;
+        startX =
+          Math.random() * width;
+
         startY = -50;
 
         vx =
@@ -162,7 +264,8 @@ export default function AnalysisPage() {
         vy =
           Math.random() * 4 + 4;
       } else if (side === 1) {
-        startX = width + 50;
+        startX =
+          width + 50;
 
         startY =
           Math.random() * height;
@@ -176,7 +279,8 @@ export default function AnalysisPage() {
         startX =
           Math.random() * width;
 
-        startY = height + 50;
+        startY =
+          height + 50;
 
         vx =
           (Math.random() - 0.5) * 6;
@@ -208,8 +312,6 @@ export default function AnalysisPage() {
         opacity: 1,
       };
     };
-
-    // Helper: Trigger Spiral Galaxy Nebula
 
     const spawnGalaxy = () => {
       const colors = [
@@ -245,13 +347,11 @@ export default function AnalysisPage() {
           colors[
             Math.floor(
               Math.random() *
-                colors.length
+                colors.length,
             )
           ],
       };
     };
-
-    // Cosmic Event Timer
 
     const eventInterval =
       setInterval(() => {
@@ -262,39 +362,35 @@ export default function AnalysisPage() {
         }
       }, 75000);
 
-    // Render Loop
-
     const render = () => {
       ctx.clearRect(
         0,
         0,
         width,
-        height
+        height,
       );
-
-      // Deep Space Canvas Gradient
 
       const spaceGradient =
         ctx.createLinearGradient(
           0,
           0,
           0,
-          height
+          height,
         );
 
       spaceGradient.addColorStop(
         0,
-        "#05060A"
+        "#05060A",
       );
 
       spaceGradient.addColorStop(
         0.5,
-        "#080911"
+        "#080911",
       );
 
       spaceGradient.addColorStop(
         1,
-        "#040508"
+        "#040508",
       );
 
       ctx.fillStyle =
@@ -304,10 +400,8 @@ export default function AnalysisPage() {
         0,
         0,
         width,
-        height
+        height,
       );
-
-      // Draw stars
 
       for (const star of stars) {
         star.y -= star.speedY;
@@ -317,7 +411,7 @@ export default function AnalysisPage() {
         star.opacity +=
           Math.sin(
             Date.now() *
-              star.pulseSpeed
+              star.pulseSpeed,
           ) * 0.005;
 
         if (star.y < 0) {
@@ -327,11 +421,13 @@ export default function AnalysisPage() {
             Math.random() * width;
         }
 
-        if (star.x < 0)
+        if (star.x < 0) {
           star.x = width;
+        }
 
-        if (star.x > width)
+        if (star.x > width) {
           star.x = 0;
+        }
 
         ctx.beginPath();
 
@@ -340,24 +436,23 @@ export default function AnalysisPage() {
           star.y,
           star.size,
           0,
-          Math.PI * 2
+          Math.PI * 2,
         );
 
         ctx.fillStyle = `rgba(215, 225, 255, ${Math.max(
           0.1,
           Math.min(
             0.75,
-            star.opacity
-          )
+            star.opacity,
+          ),
         )})`;
 
         ctx.fill();
       }
 
-      // Galaxy
-
       if (activeGalaxy) {
-        const g = activeGalaxy;
+        const g =
+          activeGalaxy;
 
         if (
           g.fadeState ===
@@ -366,7 +461,8 @@ export default function AnalysisPage() {
           g.opacity += 0.003;
 
           if (g.opacity >= 0.35) {
-            g.fadeState = "active";
+            g.fadeState =
+              "active";
           }
         } else if (
           g.fadeState ===
@@ -382,10 +478,7 @@ export default function AnalysisPage() {
             g.fadeState =
               "fadeOut";
           }
-        } else if (
-          g.fadeState ===
-          "fadeOut"
-        ) {
+        } else {
           g.opacity -= 0.002;
 
           if (g.opacity <= 0) {
@@ -398,10 +491,12 @@ export default function AnalysisPage() {
 
           ctx.translate(
             g.x,
-            g.y
+            g.y,
           );
 
-          ctx.rotate(g.angle);
+          ctx.rotate(
+            g.angle,
+          );
 
           const galaxyGradient =
             ctx.createRadialGradient(
@@ -410,22 +505,22 @@ export default function AnalysisPage() {
               0,
               0,
               0,
-              g.radius
+              g.radius,
             );
 
           galaxyGradient.addColorStop(
             0,
-            g.color
+            g.color,
           );
 
           galaxyGradient.addColorStop(
             0.4,
-            "rgba(99, 102, 241, 0.15)"
+            "rgba(99, 102, 241, 0.15)",
           );
 
           galaxyGradient.addColorStop(
             1,
-            "transparent"
+            "transparent",
           );
 
           ctx.fillStyle =
@@ -443,7 +538,7 @@ export default function AnalysisPage() {
             g.radius * 0.4,
             0,
             0,
-            Math.PI * 2
+            Math.PI * 2,
           );
 
           ctx.fill();
@@ -452,10 +547,9 @@ export default function AnalysisPage() {
         }
       }
 
-      // Comet
-
       if (activeComet) {
-        const c = activeComet;
+        const c =
+          activeComet;
 
         c.x += c.speedX;
         c.y += c.speedY;
@@ -463,17 +557,19 @@ export default function AnalysisPage() {
         const magnitude =
           Math.hypot(
             c.speedX,
-            c.speedY
+            c.speedY,
           );
 
         const tailX =
           c.x -
-          (c.speedX / magnitude) *
+          (c.speedX /
+            magnitude) *
             c.length;
 
         const tailY =
           c.y -
-          (c.speedY / magnitude) *
+          (c.speedY /
+            magnitude) *
             c.length;
 
         const cometGradient =
@@ -481,37 +577,38 @@ export default function AnalysisPage() {
             c.x,
             c.y,
             tailX,
-            tailY
+            tailY,
           );
 
         cometGradient.addColorStop(
           0,
-          "rgba(255, 255, 255, 0.95)"
+          "rgba(255, 255, 255, 0.95)",
         );
 
         cometGradient.addColorStop(
           0.2,
-          "rgba(165, 180, 252, 0.6)"
+          "rgba(165, 180, 252, 0.6)",
         );
 
         cometGradient.addColorStop(
           1,
-          "transparent"
+          "transparent",
         );
 
         ctx.beginPath();
 
         ctx.moveTo(
           c.x,
-          c.y
+          c.y,
         );
 
         ctx.lineTo(
           tailX,
-          tailY
+          tailY,
         );
 
-        ctx.lineWidth = c.size;
+        ctx.lineWidth =
+          c.size;
 
         ctx.strokeStyle =
           cometGradient;
@@ -537,7 +634,7 @@ export default function AnalysisPage() {
 
       animationFrameId =
         requestAnimationFrame(
-          render
+          render,
         );
     };
 
@@ -546,25 +643,27 @@ export default function AnalysisPage() {
     return () => {
       window.removeEventListener(
         "resize",
-        handleResize
+        handleResize,
       );
 
       clearInterval(
-        eventInterval
+        eventInterval,
       );
 
       cancelAnimationFrame(
-        animationFrameId
+        animationFrameId,
       );
     };
   }, []);
 
-  /* ---------------- Load Repository Analysis ---------------- */
+  /* ------------------------------------------------------------------------ */
+  /* Load Repository Analysis                                                */
+  /* ------------------------------------------------------------------------ */
 
   useEffect(() => {
     if (!jobId) {
       setError(
-        "Analysis ID is missing."
+        "Analysis ID is missing.",
       );
 
       setIsLoading(false);
@@ -572,13 +671,14 @@ export default function AnalysisPage() {
       return;
     }
 
-    const analysisJobId = jobId;
+    const analysisJobId =
+      jobId;
 
     async function loadAnalysis() {
       try {
         const job =
           await getRepositoryStatus(
-            analysisJobId
+            analysisJobId,
           );
 
         if (
@@ -586,7 +686,7 @@ export default function AnalysisPage() {
           "completed"
         ) {
           setError(
-            "Repository analysis is not completed yet."
+            "Repository analysis is not completed yet.",
           );
 
           setIsLoading(false);
@@ -598,7 +698,7 @@ export default function AnalysisPage() {
           !job.architectureMap
         ) {
           setError(
-            "Architecture analysis is not available."
+            "Architecture analysis is not available.",
           );
 
           setIsLoading(false);
@@ -607,12 +707,12 @@ export default function AnalysisPage() {
         }
 
         setArchitectureMap(
-          job.architectureMap
+          job.architectureMap,
         );
 
         setRepositoryTree(
           job.repositoryTree ??
-            null
+            null,
         );
 
         setIsLoading(false);
@@ -620,23 +720,201 @@ export default function AnalysisPage() {
         console.error(err);
 
         setError(
-          "Unable to load repository analysis."
+          "Unable to load repository analysis.",
         );
 
         setIsLoading(false);
       }
     }
 
-    loadAnalysis();
+    void loadAnalysis();
   }, [jobId]);
 
-  /* ---------------- File Selection ---------------- */
+  /* ------------------------------------------------------------------------ */
+  /* Resize AI Explanation Panel                                              */
+  /* ------------------------------------------------------------------------ */
+
+  const handleResizeMove =
+    useCallback(
+      (event: MouseEvent) => {
+        const delta =
+          resizeStartXRef.current -
+          event.clientX;
+
+        const nextWidth =
+          Math.min(
+            MAX_EXPLANATION_PANEL_WIDTH,
+            Math.max(
+              MIN_EXPLANATION_PANEL_WIDTH,
+              resizeStartWidthRef.current +
+                delta,
+            ),
+          );
+
+        setExplanationPanelWidth(
+          nextWidth,
+        );
+      },
+      [],
+    );
+
+  const handleResizeEnd =
+    useCallback(() => {
+      setIsResizingExplanation(
+        false,
+      );
+
+      document.body.style.userSelect =
+        "";
+
+      document.body.style.cursor =
+        "";
+
+      document.removeEventListener(
+        "mousemove",
+        handleResizeMove,
+      );
+
+      document.removeEventListener(
+        "mouseup",
+        handleResizeEnd,
+      );
+    }, [
+      handleResizeMove,
+    ]);
+
+  const handleResizeStart =
+    useCallback(
+      (
+        event: React.MouseEvent<HTMLDivElement>,
+      ) => {
+        event.preventDefault();
+
+        resizeStartXRef.current =
+          event.clientX;
+
+        resizeStartWidthRef.current =
+          explanationPanelWidth;
+
+        setIsResizingExplanation(
+          true,
+        );
+
+        document.body.style.userSelect =
+          "none";
+
+        document.body.style.cursor =
+          "col-resize";
+
+        document.addEventListener(
+          "mousemove",
+          handleResizeMove,
+        );
+
+        document.addEventListener(
+          "mouseup",
+          handleResizeEnd,
+        );
+      },
+      [
+        explanationPanelWidth,
+        handleResizeMove,
+        handleResizeEnd,
+      ],
+    );
+
+  useEffect(() => {
+    return () => {
+      document.removeEventListener(
+        "mousemove",
+        handleResizeMove,
+      );
+
+      document.removeEventListener(
+        "mouseup",
+        handleResizeEnd,
+      );
+
+      document.body.style.userSelect =
+        "";
+
+      document.body.style.cursor =
+        "";
+    };
+  }, [
+    handleResizeMove,
+    handleResizeEnd,
+  ]);
+
+  /* ------------------------------------------------------------------------ */
+  /* Build Explainer Context                                                  */
+  /* ------------------------------------------------------------------------ */
+
+  const buildRepositoryContext =
+    useCallback(
+      (path: string) => {
+        if (
+          architectureMap?.type ===
+          "structured"
+        ) {
+          const matchingLayers =
+            architectureMap.layers.filter(
+              (layer) =>
+                layer.files.includes(
+                  path,
+                ),
+            );
+
+          if (
+            matchingLayers.length > 0
+          ) {
+            return [
+              `Repository summary: ${architectureMap.summary}`,
+              "",
+              matchingLayers
+                .map(
+                  (layer) =>
+                    `Layer: ${layer.name}\nDescription: ${layer.description}`,
+                )
+                .join("\n\n"),
+            ].join("\n");
+          }
+
+          return `Repository summary: ${architectureMap.summary}`;
+        }
+
+        if (
+          architectureMap?.type ===
+          "importance-ranked"
+        ) {
+          const rankedFile =
+            architectureMap.rankedFiles.find(
+              (ranked) =>
+                ranked.path === path,
+            );
+
+          return [
+            `Repository summary: ${architectureMap.summary}`,
+            rankedFile
+              ? `File importance score: ${rankedFile.importanceScore}\nReason: ${rankedFile.reason}`
+              : "No ranking information is available for this file.",
+          ].join("\n\n");
+        }
+
+        return "No additional repository context provided.";
+      },
+      [architectureMap],
+    );
+
+  /* ------------------------------------------------------------------------ */
+  /* File Selection                                                           */
+  /* ------------------------------------------------------------------------ */
 
   const handleFileSelect =
     useCallback(
       async (
         path: string,
-        node: RepositoryTreeNode
+        node: RepositoryTreeNode,
       ) => {
         if (
           node.type !== "file" ||
@@ -650,26 +928,121 @@ export default function AnalysisPage() {
 
           setSelectedFile(null);
 
+          setFileExplanation(null);
+
+          setExplanationError(null);
+
           const file =
             await getRepositoryFile(
               jobId,
-              path
+              path,
             );
 
           setSelectedFile(file);
         } catch (error) {
           console.error(
             "Unable to load repository file",
-            error
+            error,
+          );
+
+          setExplanationError(
+            "Unable to load this file.",
           );
         } finally {
-          setIsFileLoading(
-            false
-          );
+          setIsFileLoading(false);
         }
       },
-      [jobId]
+      [jobId],
     );
+
+  /* ------------------------------------------------------------------------ */
+  /* Explain Selected File                                                    */
+  /* ------------------------------------------------------------------------ */
+
+  const handleExplainFile =
+    useCallback(async () => {
+      if (
+        !selectedFile ||
+        !jobId
+      ) {
+        return;
+      }
+
+      setIsExplanationOpen(
+        true,
+      );
+
+      if (fileExplanation) {
+        return;
+      }
+
+      try {
+        setIsExplanationLoading(
+          true,
+        );
+
+        setExplanationError(
+          null,
+        );
+
+        const repositoryContext =
+          buildRepositoryContext(
+            selectedFile.path,
+          );
+
+        const explanation =
+          await explainFile({
+            repositoryId: jobId,
+            filePath:
+              selectedFile.path,
+            content:
+              selectedFile.content,
+            repositoryContext,
+          });
+
+        setFileExplanation(
+          explanation,
+        );
+      } catch (error) {
+        console.error(
+          "Unable to explain repository file",
+          error,
+        );
+
+        setExplanationError(
+          "Unable to generate an explanation for this file.",
+        );
+      } finally {
+        setIsExplanationLoading(
+          false,
+        );
+      }
+    }, [
+      selectedFile,
+      fileExplanation,
+      buildRepositoryContext,
+      jobId,
+    ]);
+
+  /* ------------------------------------------------------------------------ */
+  /* Toggle Explanation Panel                                                 */
+  /* ------------------------------------------------------------------------ */
+
+  const handleExplanationToggle =
+    useCallback(() => {
+      if (isExplanationOpen) {
+        setIsExplanationOpen(
+          false,
+        );
+
+        return;
+      }
+
+      void handleExplainFile();
+    }, [
+      isExplanationOpen,
+      handleExplainFile,
+    ]);
 
   const totalFiles =
     architectureMap?.type ===
@@ -678,16 +1051,22 @@ export default function AnalysisPage() {
           (sum, layer) =>
             sum +
             layer.files.length,
-          0
+          0,
         )
       : architectureMap?.type ===
-        "importance-ranked"
-      ? architectureMap.rankedFiles
-          .length
-      : 0;
+          "importance-ranked"
+        ? architectureMap.rankedFiles
+            .length
+        : 0;
 
   return (
-    <main className="relative min-h-screen w-full overflow-hidden text-[#EDEDEF] selection:bg-indigo-500/30">
+    <main
+      className={`relative min-h-screen w-full overflow-hidden text-[#EDEDEF] selection:bg-indigo-500/30 ${
+        isResizingExplanation
+          ? "select-none"
+          : ""
+      }`}
+    >
       {/* Canvas particle space canvas */}
 
       <canvas
@@ -705,7 +1084,7 @@ export default function AnalysisPage() {
                 analysis · {jobId}
               </p>
 
-              <h1 className="mt-0.5 truncate text-[17px] font-medium text-white tracking-tight">
+              <h1 className="mt-0.5 truncate text-[17px] font-medium tracking-tight text-white">
                 {repositoryLabel}
               </h1>
             </div>
@@ -716,6 +1095,7 @@ export default function AnalysisPage() {
                   [
                     "overview",
                     "architecture",
+                    "qa",
                   ] as Tab[]
                 ).map((t) => (
                   <button
@@ -726,11 +1106,13 @@ export default function AnalysisPage() {
                     }
                     className={`rounded-md px-3.5 py-1.5 text-[13px] capitalize transition-all duration-200 ${
                       tab === t
-                        ? "bg-indigo-600/35 text-indigo-100 border border-indigo-400/30 shadow-[0_0_12px_rgba(99,102,241,0.25)]"
+                        ? "border border-indigo-400/30 bg-indigo-600/35 text-indigo-100 shadow-[0_0_12px_rgba(99,102,241,0.25)]"
                         : "text-slate-400 hover:text-white"
                     }`}
                   >
-                    {t}
+                    {t === "qa"
+                      ? "Q&A"
+                      : t}
                   </button>
                 ))}
               </nav>
@@ -742,9 +1124,10 @@ export default function AnalysisPage() {
 
         <div
           className={
-            tab === "architecture"
+            tab === "architecture" ||
+            tab === "qa"
               ? "w-full flex-1 px-4 py-4"
-              : "mx-auto max-w-[1200px] w-full flex-1 px-6 py-8"
+              : "mx-auto flex w-full max-w-[1200px] flex-1 px-6 py-8"
           }
         >
           {isLoading && (
@@ -816,9 +1199,7 @@ export default function AnalysisPage() {
                     "structured" ? (
                       <div className="mt-8 space-y-3">
                         {architectureMap.layers.map(
-                          (
-                            layer
-                          ) => (
+                          (layer) => (
                             <div
                               key={
                                 layer.name
@@ -854,15 +1235,13 @@ export default function AnalysisPage() {
                                 }
                               </p>
                             </div>
-                          )
+                          ),
                         )}
                       </div>
                     ) : (
                       <div className="mt-8 space-y-3">
                         {architectureMap.rankedFiles.map(
-                          (
-                            file
-                          ) => (
+                          (file) => (
                             <div
                               key={
                                 file.path
@@ -878,7 +1257,7 @@ export default function AnalysisPage() {
 
                                 <span className="shrink-0 font-mono text-[11px] text-indigo-400">
                                   {file.importanceScore.toFixed(
-                                    2
+                                    2,
                                   )}
                                 </span>
                               </div>
@@ -889,7 +1268,7 @@ export default function AnalysisPage() {
                                 }
                               </p>
                             </div>
-                          )
+                          ),
                         )}
                       </div>
                     )}
@@ -903,7 +1282,7 @@ export default function AnalysisPage() {
                   <div className="flex h-[calc(100vh-140px)] w-full gap-4">
                     {/* Repository Tree */}
 
-                    <div className="w-[320px] shrink-0 overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.02]">
+                    <div className="w-[300px] shrink-0 overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.02]">
                       {repositoryTree ? (
                         <RepositoryTree
                           tree={
@@ -920,61 +1299,156 @@ export default function AnalysisPage() {
                       )}
                     </div>
 
-                    {/* Source Viewer */}
+                    {/* Source + Optional AI Explanation */}
 
-                    <div className="min-w-0 flex-1 overflow-hidden rounded-xl border border-white/[0.08] bg-[#08090D]">
-                      {isFileLoading ? (
-                        <div className="flex h-full items-center justify-center">
-                          <p className="font-mono text-[13px] text-slate-500">
-                            Loading source...
-                          </p>
-                        </div>
-                      ) : selectedFile ? (
-                        <div className="flex h-full flex-col">
-                          {/* File Header */}
+                    <div className="flex min-w-0 flex-1">
+                      {/* Source Viewer */}
 
-                          <div className="flex shrink-0 items-center justify-between border-b border-white/[0.08] px-5 py-3">
-                            <div className="min-w-0">
-                              <p className="font-mono text-[11px] text-slate-500">
-                                SOURCE
-                              </p>
+                      <div
+                        className={`min-w-0 flex-1 overflow-hidden rounded-xl border border-white/[0.08] bg-[#08090D] ${
+                          isExplanationOpen
+                            ? "rounded-r-none border-r-0"
+                            : ""
+                        }`}
+                      >
+                        {isFileLoading ? (
+                          <div className="flex h-full items-center justify-center">
+                            <p className="font-mono text-[13px] text-slate-500">
+                              Loading source...
+                            </p>
+                          </div>
+                        ) : selectedFile ? (
+                          <div className="flex h-full flex-col">
+                            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/[0.08] px-5 py-3">
+                              <div className="min-w-0">
+                                <p className="font-mono text-[11px] text-slate-500">
+                                  SOURCE
+                                </p>
 
-                              <p className="mt-0.5 truncate font-mono text-[13px] text-slate-200">
-                                {
-                                  selectedFile.path
+                                <p
+                                  className="mt-0.5 truncate font-mono text-[13px] text-slate-200"
+                                  title={
+                                    selectedFile.path
+                                  }
+                                >
+                                  {
+                                    selectedFile.path
+                                  }
+                                </p>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={
+                                  handleExplanationToggle
                                 }
-                              </p>
+                                className={`group flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-[12px] font-medium transition-all ${
+                                  isExplanationOpen
+                                    ? "border-indigo-400/30 bg-indigo-500/15 text-indigo-200 hover:bg-indigo-500/20"
+                                    : "border-white/[0.08] bg-white/[0.03] text-slate-300 hover:border-indigo-400/30 hover:bg-indigo-500/10 hover:text-indigo-200"
+                                }`}
+                                aria-expanded={
+                                  isExplanationOpen
+                                }
+                              >
+                                {isExplanationOpen ? (
+                                  <PanelRightClose className="h-3.5 w-3.5" />
+                                ) : (
+                                  <Brain className="h-3.5 w-3.5 text-indigo-400" />
+                                )}
+
+                                <span>
+                                  {isExplanationOpen
+                                    ? "Hide AI"
+                                    : "Explain with AI"}
+                                </span>
+                              </button>
+                            </div>
+
+                            <div className="custom-scrollbar flex-1 overflow-auto">
+                              <pre className="min-h-full px-5 py-5 font-mono text-[12px] leading-6 text-slate-300">
+                                <code>
+                                  {
+                                    selectedFile.content
+                                  }
+                                </code>
+                              </pre>
                             </div>
                           </div>
+                        ) : (
+                          <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+                            <p className="font-mono text-[13px] text-slate-400">
+                              Select a file
+                            </p>
 
-                          {/* Source Code */}
-
-                          <div className="custom-scrollbar flex-1 overflow-auto">
-                            <pre className="min-h-full px-5 py-5 font-mono text-[12px] leading-6 text-slate-300">
-                              <code>
-                                {
-                                  selectedFile.content
-                                }
-                              </code>
-                            </pre>
+                            <p className="mt-2 max-w-sm text-[12px] leading-5 text-slate-600">
+                              Choose a file from the repository tree to inspect its source code.
+                            </p>
                           </div>
-                        </div>
-                      ) : (
-                        <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-                          <p className="font-mono text-[13px] text-slate-400">
-                            Select a file
-                          </p>
+                        )}
+                      </div>
 
-                          <p className="mt-2 max-w-sm text-[12px] leading-5 text-slate-600">
-                            Choose a file from
-                            the repository
-                            tree to inspect
-                            its source code.
-                          </p>
-                        </div>
+                      {/* Resizable AI Explanation Panel */}
+
+                      {isExplanationOpen && (
+                        <>
+                          <div
+                            role="separator"
+                            aria-orientation="vertical"
+                            aria-label="Resize AI explanation panel"
+                            onMouseDown={
+                              handleResizeStart
+                            }
+                            title="Drag to resize"
+                            className={`group relative flex w-3 shrink-0 cursor-col-resize items-center justify-center border-y border-white/[0.08] bg-[#08090D] transition-colors ${
+                              isResizingExplanation
+                                ? "bg-indigo-500/10"
+                                : "hover:bg-white/[0.03]"
+                            }`}
+                          >
+                            <span className="flex h-10 w-3 items-center justify-center rounded-full border border-white/[0.08] bg-slate-900 text-slate-600 transition-colors group-hover:border-indigo-400/20 group-hover:text-indigo-300">
+                              <GripVertical className="h-3.5 w-3.5" />
+                            </span>
+                          </div>
+
+                          <div
+                            className="shrink-0 overflow-hidden rounded-r-xl border border-white/[0.08] border-l-0 bg-[#08090D]"
+                            style={{
+                              width: `${explanationPanelWidth}px`,
+                            }}
+                          >
+                            <ExplanationPanel
+                              explanation={
+                                fileExplanation
+                              }
+                              isLoading={
+                                isExplanationLoading
+                              }
+                              error={
+                                explanationError
+                              }
+                            />
+                          </div>
+                        </>
                       )}
                     </div>
                   </div>
+                )}
+
+                {/* Q&A Tab */}
+
+                {tab === "qa" && (
+                  <QAChat
+                    repositoryId={
+                      jobId ?? ""
+                    }
+                    repositoryTree={
+                      repositoryTree
+                    }
+                    onSelectFile={
+                      handleFileSelect
+                    }
+                  />
                 )}
               </>
             )}

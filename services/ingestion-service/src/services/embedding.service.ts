@@ -1,32 +1,85 @@
-import "dotenv/config";
+import {
+  env,
+  pipeline,
+} from "@huggingface/transformers";
 
-import { GoogleGenAI } from "@google/genai";
+const EMBEDDING_MODEL =
+  "onnx-community/all-MiniLM-L6-v2-ONNX";
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-});
+const EMBEDDING_DIMENSION = 384;
 
-const EMBEDDING_MODEL = "gemini-embedding-001";
-const OUTPUT_DIMENSIONALITY = 768;
+env.cacheDir =
+  process.env.HF_CACHE_DIR ??
+  "./.cache/huggingface";
+
+type EmbeddingPipeline =
+  Awaited<
+    ReturnType<
+      typeof pipeline<
+        "feature-extraction"
+      >
+    >
+  >;
+
+let embeddingPipeline:
+  | EmbeddingPipeline
+  | null = null;
+
+async function getEmbeddingPipeline() {
+  if (!embeddingPipeline) {
+    embeddingPipeline =
+      await pipeline(
+        "feature-extraction",
+        EMBEDDING_MODEL,
+      );
+  }
+
+  return embeddingPipeline;
+}
 
 export async function generateEmbedding(
   text: string,
 ): Promise<number[]> {
-  const response = await ai.models.embedContent({
-    model: EMBEDDING_MODEL,
-    contents: text,
-    config: {
-      outputDimensionality: OUTPUT_DIMENSIONALITY,
-    },
-  });
+  const normalizedText =
+    text.trim();
 
-  if (!response.embeddings?.[0]?.values) {
+  if (!normalizedText) {
     throw new Error(
-      "Gemini did not return an embedding",
+      "Cannot generate embedding for empty text",
     );
   }
 
-  return response.embeddings[0].values;
+  const extractor =
+    await getEmbeddingPipeline();
+
+  const output =
+    await extractor(
+      normalizedText,
+      {
+        pooling: "mean",
+        normalize: true,
+      },
+    );
+
+  const values =
+    output.tolist();
+
+  const embedding =
+    values[0] as number[];
+
+  if (
+    !embedding ||
+    embedding.length !==
+      EMBEDDING_DIMENSION
+  ) {
+    throw new Error(
+      `Expected embedding dimension ${EMBEDDING_DIMENSION}, received ${
+        embedding?.length ?? 0
+      }`,
+    );
+  }
+
+  return embedding;
 }
 
 export async function generateEmbeddings(
@@ -36,29 +89,57 @@ export async function generateEmbeddings(
     return [];
   }
 
-  const response = await ai.models.embedContent({
-    model: EMBEDDING_MODEL,
-    contents: texts,
-    config: {
-      outputDimensionality: OUTPUT_DIMENSIONALITY,
-    },
-  });
+  const normalizedTexts =
+    texts.map((text) =>
+      text.trim(),
+    );
 
-  const embeddings = response.embeddings;
-
-  if (!embeddings || embeddings.length !== texts.length) {
+  if (
+    normalizedTexts.some(
+      (text) => !text,
+    )
+  ) {
     throw new Error(
-      "Gemini did not return embeddings for all inputs",
+      "Cannot generate embeddings for empty text",
     );
   }
 
-  return embeddings.map((embedding) => {
-    if (!embedding.values) {
+  const extractor =
+    await getEmbeddingPipeline();
+
+  const output =
+    await extractor(
+      normalizedTexts,
+      {
+        pooling: "mean",
+        normalize: true,
+      },
+    );
+
+  const values =
+    output.tolist() as number[][];
+
+  if (
+    values.length !==
+    normalizedTexts.length
+  ) {
+    throw new Error(
+      "Embedding count does not match input count",
+    );
+  }
+
+  for (
+    const embedding of values
+  ) {
+    if (
+      embedding.length !==
+      EMBEDDING_DIMENSION
+    ) {
       throw new Error(
-        "Gemini returned an embedding without values",
+        `Expected embedding dimension ${EMBEDDING_DIMENSION}, received ${embedding.length}`,
       );
     }
+  }
 
-    return embedding.values;
-  });
+  return values;
 }

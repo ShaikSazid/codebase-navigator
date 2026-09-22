@@ -1,8 +1,21 @@
 import { Router } from "express";
-import { askQuestion } from "../controllers/qa.controller";
 
-const router = Router();
+import {
+  askQuestion,
+  navigateQuestionController,
+} from "../controllers/qa.controller.js";
 
-router.post("/ask", askQuestion);
+const router =
+  Router();
+
+router.post(
+  "/ask",
+  askQuestion,
+);
+
+router.post(
+  "/navigate",
+  navigateQuestionController,
+);
 
 export default router;

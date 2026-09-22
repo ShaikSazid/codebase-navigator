@@ -1,5 +1,27 @@
-import path from "node:path";
-import type { DependencyEdge, FileNode, RepoFileIndex } from "../types/repo.js";
+import type {
+  DependencyEdge,
+  FileNode,
+  RepoFileIndex,
+  RepositoryRelationship,
+  RepositorySymbol,
+} from "../types/repo.js";
+
+import {
+  indexRepositoryFiles,
+} from "./code-intelligence/code-indexer.service.js";
+
+import type {
+  CodeRelationship,
+} from "./code-intelligence/indexer.types.js";
+
+export interface RepositoryFileContext {
+  filePath: string;
+  language?: string;
+  dependencies: string[];
+  usedBy: string[];
+  symbols: RepositorySymbol[];
+  relationships: RepositoryRelationship[];
+}
 
 export function buildRepositoryIndex(
   repositoryIndex: string,
@@ -8,134 +30,279 @@ export function buildRepositoryIndex(
     content: string;
   }>,
 ): RepoFileIndex {
-  const fileNodes: FileNode[] = files.map((file) => ({
-    path: file.path,
-    imports: extractImports(file.content),
-  }));
+  const codeIndex =
+    indexRepositoryFiles(
+      repositoryIndex,
+      files.map(
+        (file) => ({
+          filePath:
+            file.path,
+          content:
+            file.content,
+        }),
+      ),
+    );
 
-  const dependencyEdges = buildDependencyEdges(fileNodes);
+  const languageByFile =
+    new Map<
+      string,
+      string
+    >();
+
+  for (
+    const file of
+      codeIndex.files
+  ) {
+    languageByFile.set(
+      file.path,
+      file.language,
+    );
+  }
+
+  const symbolsByFile =
+    new Map<
+      string,
+      RepositorySymbol[]
+    >();
+
+  for (
+    const symbol of
+      codeIndex.symbols
+  ) {
+    const symbols =
+      symbolsByFile.get(
+        symbol.filePath,
+      ) ?? [];
+
+    symbols.push({
+      name:
+        symbol.name,
+      kind:
+        symbol.kind,
+      startLine:
+        symbol.startLine,
+      endLine:
+        symbol.endLine,
+      signature:
+        symbol.signature,
+      routePaths:
+        symbol.routePaths,
+    });
+
+    symbolsByFile.set(
+      symbol.filePath,
+      symbols,
+    );
+  }
+
+  const importsByFile =
+    new Map<
+      string,
+      string[]
+    >();
+
+  for (
+    const file of
+      codeIndex.files
+  ) {
+    importsByFile.set(
+      file.path,
+      unique(
+        file.imports.map(
+          (importInfo) =>
+            importInfo.moduleSpecifier,
+        ),
+      ),
+    );
+  }
+
+  const fileNodes:
+    FileNode[] =
+    files.map(
+      (file) => ({
+        path:
+          file.path,
+
+        imports:
+          importsByFile.get(
+            file.path,
+          ) ?? [],
+
+        language:
+          languageByFile.get(
+            file.path,
+          ),
+
+        symbols:
+          symbolsByFile.get(
+            file.path,
+          ) ?? [],
+      }),
+    );
+
+  const dependencyEdges =
+    buildDependencyEdges(
+      codeIndex.relationships,
+    );
+
+  const relationships:
+    RepositoryRelationship[] =
+    codeIndex.relationships.map(
+      (relationship) => ({
+        source:
+          relationship.source,
+        target:
+          relationship.target,
+        kind:
+          relationship.kind,
+        confidence:
+          relationship.confidence,
+        evidence:
+          relationship.evidence,
+      }),
+    );
 
   return {
     repositoryIndex,
-    files: fileNodes,
+    files:
+      fileNodes,
     dependencyEdges,
+    relationships,
+    dataModels:
+      codeIndex.dataModels,
   };
 }
 
-function extractImports(content: string): string[] {
-  const imports: string[] = [];
+export function getRepositoryFileContext(
+  repositoryIndex: RepoFileIndex,
+  filePath: string,
+): RepositoryFileContext | null {
+  const fileNode =
+    repositoryIndex.files.find(
+      (file) =>
+        file.path ===
+        filePath,
+    );
 
-  const importRegex =
-    /import\s+(?:[\s\S]*?\s+from\s+)?["']([^"']+)["']/g;
-
-  let match: RegExpExecArray | null;
-
-  while ((match = importRegex.exec(content)) !== null) {
-    imports.push(match[1]);
+  if (!fileNode) {
+    return null;
   }
 
-  const requireRegex =
-    /require\s*\(\s*["']([^"']+)["']\s*\)/g;
+  const dependencies =
+    unique(
+      repositoryIndex.dependencyEdges
+        .filter(
+          (
+            edge: DependencyEdge,
+          ) =>
+            edge.source ===
+            filePath,
+        )
+        .map(
+          (
+            edge: DependencyEdge,
+          ) =>
+            edge.target,
+        ),
+    );
 
-  while ((match = requireRegex.exec(content)) !== null) {
-    imports.push(match[1]);
-  }
+  const usedBy =
+    unique(
+      repositoryIndex.dependencyEdges
+        .filter(
+          (
+            edge: DependencyEdge,
+          ) =>
+            edge.target ===
+            filePath,
+        )
+        .map(
+          (
+            edge: DependencyEdge,
+          ) =>
+            edge.source,
+        ),
+    );
 
-  return [...new Set(imports)];
+  const relationships =
+    (
+      repositoryIndex
+        .relationships ?? []
+    ).filter(
+      (relationship) =>
+        relationship.source ===
+          filePath ||
+        relationship.target ===
+          filePath,
+    );
+
+  return {
+    filePath,
+
+    language:
+      fileNode.language,
+
+    dependencies,
+
+    usedBy,
+
+    symbols:
+      fileNode.symbols ?? [],
+
+    relationships,
+  };
 }
 
-function buildDependencyEdges(fileNodes: FileNode[]): DependencyEdge[] {
-  const repositoryFiles = new Set(fileNodes.map((file) => file.path));
+function buildDependencyEdges(
+  relationships:
+    CodeRelationship[],
+): DependencyEdge[] {
+  const seen =
+    new Set<string>();
 
-  const edges: DependencyEdge[] = [];
+  const edges:
+    DependencyEdge[] =
+    [];
 
-  for (const file of fileNodes) {
-    for (const importedPath of file.imports) {
-      const target = resolveInternalImport(
-        file.path,
-        importedPath,
-        repositoryFiles,
-      );
-
-      if (!target) {
-        continue;
-      }
-
-      edges.push({
-        source: file.path,
-        target,
-      });
+  for (
+    const relationship of
+      relationships
+  ) {
+    if (
+      relationship.kind !==
+      "imports"
+    ) {
+      continue;
     }
+
+    const key =
+      `${relationship.source}->${relationship.target}`;
+
+    if (
+      seen.has(key)
+    ) {
+      continue;
+    }
+
+    seen.add(key);
+
+    edges.push({
+      source:
+        relationship.source,
+      target:
+        relationship.target,
+    });
   }
 
   return edges;
 }
 
-function resolveInternalImport(
-  sourceFile: string,
-  importedPath: string,
-  repositoryFiles: Set<string>,
-): string | null {
-  // Ignore external packages such as express, react, axios, etc.
-  if (!importedPath.startsWith(".")) {
-    return null;
-  }
-
-  const sourceDirectory = path.posix.dirname(sourceFile);
-
-  const resolvedPath = path.posix.normalize(
-    path.posix.join(sourceDirectory, importedPath),
-  );
-
-  const candidates = getCandidatePaths(resolvedPath);
-
-  for (const candidate of candidates) {
-    if (repositoryFiles.has(candidate)) {
-      return candidate;
-    }
-  }
-
-  return null;
-}
-
-function getCandidatePaths(importPath: string): string[] {
-  const extension = path.posix.extname(importPath);
-
-  // TypeScript projects commonly use .js in import statements
-  // even though the actual source file is .ts.
-  if (extension === ".js") {
-    return [
-      importPath,
-      `${importPath.slice(0, -3)}.ts`,
-      `${importPath.slice(0, -3)}.tsx`,
-      `${importPath.slice(0, -3)}.js`,
-      `${importPath.slice(0, -3)}.jsx`,
-    ];
-  }
-
-  if (extension === ".ts") {
-    return [
-      importPath,
-      `${importPath.slice(0, -3)}.tsx`,
-      `${importPath.slice(0, -3)}.js`,
-    ];
-  }
-
-  if (extension === ".tsx") {
-    return [
-      importPath,
-      `${importPath.slice(0, -4)}.ts`,
-      `${importPath.slice(0, -4)}.js`,
-    ];
-  }
-
-  // Extensionless imports such as:
-  // import "./auth"
+function unique(
+  values: string[],
+): string[] {
   return [
-    importPath,
-    `${importPath}.ts`,
-    `${importPath}.tsx`,
-    `${importPath}.js`,
-    `${importPath}.jsx`,
+    ...new Set(
+      values,
+    ),
   ];
 }
