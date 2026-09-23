@@ -3,6 +3,8 @@ import {
   pipeline,
 } from "@huggingface/transformers";
 
+import { logMemory } from "../utils/diagnostics.js";
+
 const EMBEDDING_MODEL =
   "onnx-community/all-MiniLM-L6-v2-ONNX";
 
@@ -27,11 +29,27 @@ let embeddingPipeline:
 
 async function getEmbeddingPipeline() {
   if (!embeddingPipeline) {
+    logMemory(
+      "BEFORE EMBEDDING MODEL LOAD",
+    );
+
+    console.log(
+      `[EMBEDDING] Loading model: ${EMBEDDING_MODEL}`,
+    );
+
     embeddingPipeline =
       await pipeline(
         "feature-extraction",
         EMBEDDING_MODEL,
       );
+
+    console.log(
+      "[EMBEDDING] Model loaded successfully",
+    );
+
+    logMemory(
+      "AFTER EMBEDDING MODEL LOAD",
+    );
   }
 
   return embeddingPipeline;

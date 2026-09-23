@@ -1,15 +1,10 @@
 import axios from "axios";
-import {cloneRepository, cleanupRepository} from "./repository.service.js";
-import {readRepositoryFiles, type RepositoryFile} from "./file.service.js";
+import { cloneRepository, cleanupRepository } from "./repository.service.js";
+import { readRepositoryFiles, type RepositoryFile } from "./file.service.js";
 import { chunkRepository } from "./chunk-repository.service.js";
-import { embedChunks } from "./embedding-repository.service.js";
-import { storeEmbeddedChunks } from "./vector-store.service.js";
+import { embedAndStoreChunks } from "./embedding-repository.service.js";
 import { buildRepositoryIndex, getRepositoryFileContext as getIndexedFileContext, type RepositoryFileContext } from "./repository-index.service.js";
-
-import {
-  buildRepositoryTree,
-  type RepositoryTreeNode,
-} from "./repository-tree.service.js";
+import {buildRepositoryTree, type RepositoryTreeNode} from "./repository-tree.service.js";
 
 import type { RepoFileIndex } from "../types/repo.js";
 
@@ -57,8 +52,7 @@ export async function ingestRepository(
       );
 
     console.log(
-      `Repository tree built: ${
-        repositoryTree.children?.length ?? 0
+      `Repository tree built: ${repositoryTree.children?.length ?? 0
       } root entries`,
     );
 
@@ -73,10 +67,8 @@ export async function ingestRepository(
     );
 
     console.log(
-      `Repository index built: ${
-        repositoryIndex.files.length
-      } files, ${
-        repositoryIndex.dependencyEdges.length
+      `Repository index built: ${repositoryIndex.files.length
+      } files, ${repositoryIndex.dependencyEdges.length
       } dependencies`,
     );
 
@@ -99,20 +91,14 @@ export async function ingestRepository(
         `Repository chunks created: ${chunks.length}`,
       );
 
-      const embeddedChunks =
-        await embedChunks(
+      const storedCount =
+        await embedAndStoreChunks(
           chunks,
           repositoryId,
         );
 
-      await storeEmbeddedChunks(
-        embeddedChunks,
-      );
-
       console.log(
-        `Repository embeddings stored: ${
-          embeddedChunks.length
-        }`,
+        `Repository embeddings stored: ${storedCount}`,
       );
     } catch (error) {
       console.error(
