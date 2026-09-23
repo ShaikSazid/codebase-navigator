@@ -8,5 +8,65 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
 
+  api-gateway:
+    build:
+      context: ../apps/api-gateway
+    container_name: codebase-api-gateway
+    ports:
+      - "5000:5000"
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      FRONTEND_URL: http://127.0.0.1:5173
+      INGESTION_SERVICE_URL: http://ingestion-service:5001
+      QA_SERVICE_URL: http://qa-service:5002
+      AGENT_ORCHESTRATOR_URL: http://agent-orchestrator:5003
+    depends_on:
+      - ingestion-service
+      - qa-service
+      - agent-orchestrator
+
+  ingestion-service:
+    build:
+      context: ../services/ingestion-service
+    container_name: codebase-ingestion
+    ports:
+      - "5001:5001"
+    environment:
+      NODE_ENV: production
+      PORT: 5001
+      QDRANT_URL: ${QDRANT_URL}
+      QDRANT_API_KEY: ${QDRANT_API_KEY}
+      HF_CACHE_DIR: /app/.cache/huggingface
+      AGENT_ORCHESTRATOR_URL: http://agent-orchestrator:5003
+
+  qa-service:
+    build:
+      context: ../services/qa-service
+    container_name: codebase-qa
+    ports:
+      - "5002:5002"
+    environment:
+      NODE_ENV: production
+      PORT: 5002
+      QDRANT_URL: ${QDRANT_URL}
+      QDRANT_API_KEY: ${QDRANT_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      INGESTION_SERVICE_URL: http://ingestion-service:5001
+      HF_CACHE_DIR: /app/.cache/huggingface
+    depends_on:
+      - ingestion-service
+
+  agent-orchestrator:
+    build:
+      context: ../services/agent-orchestrator
+    container_name: codebase-agent-orchestrator
+    ports:
+      - "5003:5003"
+    environment:
+      NODE_ENV: production
+      PORT: 5003
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+
 volumes:
   qdrant_data:

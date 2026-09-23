@@ -143,6 +143,8 @@ repos/
 workspace/
 workspaces/
 
+infra/.env
+
 
 # ============================================================
 # Docker
