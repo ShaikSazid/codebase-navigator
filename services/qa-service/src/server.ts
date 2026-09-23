@@ -24,6 +24,13 @@ app.use(express.json());
 
 app.use("/api/qa", qaRoutes);
 
+app.get("/api/health", (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    service: "Q/A service",
+  });
+});
+
 const PORT = Number(process.env.PORT) || 5002;
 
 app.listen(PORT, "0.0.0.0", () =>
