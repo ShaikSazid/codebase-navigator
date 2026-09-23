@@ -11,6 +11,13 @@ const app = express();
 
 app.use(express.json());
 
+app.get("/api/health", (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    service: "ingestion-service",
+  });
+});
+
 app.post("/internal/ingest", async (req, res) => {
   try {
     const { url, repositoryId } = req.body;
