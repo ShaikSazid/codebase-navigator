@@ -37,6 +37,13 @@ app.post("/internal/map", async (req, res) => {
   }
 });
 
+app.get("/api/health", (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    service: "ingestion-service",
+  });
+});
+
 app.post("/internal/explain", async (req, res) => {
   try {
     const input = req.body as ExplainerInput;
