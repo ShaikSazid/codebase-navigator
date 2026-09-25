@@ -4,7 +4,7 @@ import {
   getRepositoryFile,
   getRepositoryFileContext,
   ingestRepository,
-  getRepositoryIndex
+  getRepositoryIndex,
 } from "./services/ingestion.service.js";
 
 const app = express();
@@ -18,87 +18,115 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
-app.post("/internal/ingest", async (req, res) => {
-  try {
-    const { url, repositoryId } = req.body;
+app.post(
+  "/internal/ingest",
+  async (req, res) => {
+    try {
+      const {
+        url,
+        repositoryId,
+      } = req.body;
 
-    if (!url || !repositoryId) {
-      return res.status(400).json({
-        message: "Url and RepositoryId are required",
+      if (!url || !repositoryId) {
+        return res.status(400).json({
+          message:
+            "Url and RepositoryId are required",
+        });
+      }
+
+      const result =
+        await ingestRepository(
+          url,
+          repositoryId,
+        );
+
+      return res.status(200).json({
+        message:
+          "Repository ingestion completed",
+        repositoryId,
+        architectureMap:
+          result.architectureMap,
+        repositoryTree:
+          result.repositoryTree,
+      });
+    } catch (error) {
+      console.error(
+        "Repository ingestion failed",
+        error,
+      );
+
+      return res.status(500).json({
+        message:
+          "Repository ingestion failed",
       });
     }
-
-    const result = await ingestRepository(
-      url,
-      repositoryId,
-    );
-
-    return res.status(200).json({
-      message: "Repository ingestion completed",
-      repositoryId,
-      architectureMap:
-        result.architectureMap,
-      repositoryTree:
-        result.repositoryTree,
-    });
-  } catch (error) {
-    console.error(
-      "Repository ingestion failed",
-      error,
-    );
-
-    return res.status(500).json({
-      message: "Repository ingestion failed",
-    });
-  }
-});
+  },
+);
 
 app.get(
   "/internal/repository-index/:repositoryId",
-  (req, res) => {
-    const repositoryIndex =
-      getRepositoryIndex(
-        req.params.repositoryId,
+  async (req, res) => {
+    try {
+      const repositoryIndex =
+        await getRepositoryIndex(
+          req.params.repositoryId,
+        );
+
+      if (!repositoryIndex) {
+        return res.status(404).json({
+          message:
+            "Repository index not found",
+        });
+      }
+
+      return res.status(200).json({
+        repositoryIndex,
+      });
+    } catch (error) {
+      console.error(
+        "Repository index retrieval failed",
+        error,
       );
 
-    if (!repositoryIndex) {
-      return res.status(404).json({
+      return res.status(500).json({
         message:
-          "Repository index not found",
+          "Repository index retrieval failed",
       });
     }
-
-    return res.status(200).json({
-      repositoryIndex,
-    });
   },
 );
 
 app.get(
   "/internal/repositories/:repositoryId/files",
-  (req, res) => {
+  async (req, res) => {
     try {
-      const { repositoryId } = req.params;
-      const filePath = req.query.path;
+      const {
+        repositoryId,
+      } = req.params;
+
+      const filePath =
+        req.query.path;
 
       if (
         typeof filePath !== "string" ||
         !filePath
       ) {
         return res.status(400).json({
-          message: "File path is required",
+          message:
+            "File path is required",
         });
       }
 
       const file =
-        getRepositoryFile(
+        await getRepositoryFile(
           repositoryId,
           filePath,
         );
 
       if (!file) {
         return res.status(404).json({
-          message: "Repository file not found",
+          message:
+            "Repository file not found",
         });
       }
 
@@ -120,27 +148,32 @@ app.get(
   },
 );
 
-
 app.get(
   "/internal/repositories/:repositoryId/files/context",
-  (req, res) => {
+  async (req, res) => {
     try {
-      const { repositoryId } = req.params;
-      const filePath = req.query.path;
+      const {
+        repositoryId,
+      } = req.params;
+
+      const filePath =
+        req.query.path;
 
       if (
         typeof filePath !== "string" ||
         !filePath
       ) {
         return res.status(400).json({
-          message: "File path is required",
+          message:
+            "File path is required",
         });
       }
 
-      const context = getRepositoryFileContext(
-        repositoryId,
-        filePath,
-      );
+      const context =
+        await getRepositoryFileContext(
+          repositoryId,
+          filePath,
+        );
 
       if (!context) {
         return res.status(404).json({

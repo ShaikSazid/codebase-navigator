@@ -1,9 +1,12 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import { randomUUID } from "crypto";
 import logger from "../logger/index.js";
+import { Job } from "bullmq";
+import { randomUUID } from "node:crypto";
 import axios from "axios";
+
+import { repositoryIngestionQueue } from "../queue/ingestion.queue.js";
 
 type ArchitectureMap =
   | {
@@ -32,118 +35,48 @@ type RepositoryTreeNode = {
   children?: RepositoryTreeNode[];
 };
 
-const jobs = new Map<
-  string,
-  {
-    jobId: string;
-    url: string;
-    status:
-      | "queued"
-      | "processing"
-      | "completed"
-      | "failed";
-    architectureMap?: ArchitectureMap;
-    repositoryTree?: RepositoryTreeNode;
-  }
->();
-
-const INGESTION_SERVICE_URL =
-  process.env.INGESTION_SERVICE_URL ||
-  "http://localhost:5001";
-
-export function createRepositoryAnalysis(
+export async function createRepositoryAnalysis(
   url: string,
 ) {
-  const jobId = randomUUID();
+  const jobId = crypto.randomUUID();
 
-  const job = {
-    jobId,
-    url,
-    status: "queued" as const,
-  };
-
-  jobs.set(jobId, job);
+  const job = await repositoryIngestionQueue.add(
+    "repository-analysis",
+    {
+      url,
+      repositoryId: jobId,
+    },
+    {
+      jobId,
+      removeOnComplete: false,
+      removeOnFail: false,
+    },
+  );
 
   logger.info(
     {
       jobId,
       repositoryUrl: url,
-      status: job.status,
+      status: "queued",
     },
-    "Repository analysis job required",
+    "Repository analysis job created",
   );
-
-  processRepositoryAnalysis(jobId);
 
   return {
     message: "Repository analysis started",
-    jobId,
+    jobId: job.id,
     url,
-    status: job.status,
+    status: "queued",
   };
 }
 
-async function processRepositoryAnalysis(
+export async function getRepositoryAnalysis(
   jobId: string,
 ) {
-  const job = jobs.get(jobId);
-
-  if (!job) return;
-
-  job.status = "processing";
-
-  logger.info(
-    {
-      jobId,
-      status: job.status,
-    },
-    "Repository analysis processing started",
+  const job = await Job.fromId(
+    repositoryIngestionQueue,
+    jobId,
   );
-
-  try {
-    const response = await axios.post(
-      `${INGESTION_SERVICE_URL}/internal/ingest`,
-      {
-        url: job.url,
-        repositoryId: jobId,
-      },
-    );
-
-    // Store the architecture analysis
-    job.architectureMap =
-  response.data.architectureMap;
-
-    // Store the repository tree
-    job.repositoryTree =
-      response.data.repositoryTree;
-
-    job.status = "completed";
-
-    logger.info(
-      {
-        jobId,
-        status: job.status,
-      },
-      "Repository analysis completed",
-    );
-  } catch (error) {
-    job.status = "failed";
-
-    logger.error(
-      {
-        jobId,
-        error,
-        status: job.status,
-      },
-      "Repository analysis failed",
-    );
-  }
-}
-
-export function getRepositoryAnalysis(
-  jobId: string,
-) {
-  const job = jobs.get(jobId);
 
   logger.info(
     {
@@ -153,13 +86,81 @@ export function getRepositoryAnalysis(
     "Repository analysis job lookup",
   );
 
-  return job;
+  if (!job) {
+    return null;
+  }
+
+  const state = await job.getState();
+
+  let status:
+    | "queued"
+    | "processing"
+    | "completed"
+    | "failed";
+
+  switch (state) {
+    case "waiting":
+    case "delayed":
+      status = "queued";
+      break;
+
+    case "active":
+      status = "processing";
+      break;
+
+    case "completed":
+      status = "completed";
+      break;
+
+    case "failed":
+      status = "failed";
+      break;
+
+    default:
+      status = "queued";
+  }
+
+  const result = job.returnvalue as
+    | {
+        architectureMap?: ArchitectureMap;
+        repositoryTree?: RepositoryTreeNode;
+      }
+    | undefined;
+
+  return {
+    jobId: job.id,
+    url: job.data.url,
+    status,
+
+    ...(state !== "waiting" && state !== "delayed"
+      ? {
+          progress: job.progress,
+        }
+      : {}),
+
+    ...(state === "completed" && result
+      ? {
+          architectureMap: result.architectureMap,
+          repositoryTree: result.repositoryTree,
+        }
+      : {}),
+
+    ...(state === "failed"
+      ? {
+          error: job.failedReason,
+        }
+      : {}),
+  };
 }
 
 export async function getRepositoryFile(
   repositoryId: string,
   filePath: string,
 ) {
+  const INGESTION_SERVICE_URL =
+    process.env.INGESTION_SERVICE_URL ||
+    "http://localhost:5001";
+
   const response = await axios.get(
     `${INGESTION_SERVICE_URL}/internal/repositories/${repositoryId}/files`,
     {

@@ -30,11 +30,6 @@ export async function cloneRepository(url: string): Promise<string> {
   return destination;
 }
 
-export async function cleanupRepository(
-  repositoryPath: string
-): Promise<void> {
-  await rm(repositoryPath, {
-    recursive: true,
-    force: true,
-  });
+export async function cleanupRepository(repositoryPath: string): Promise<void> {
+  await rm(repositoryPath, { recursive: true, force: true });
 }
