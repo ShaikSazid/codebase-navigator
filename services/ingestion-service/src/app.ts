@@ -5,18 +5,23 @@ import {
   getRepositoryFileContext,
   ingestRepository,
   getRepositoryIndex,
+  getRepositoryAnalysisMetadata,
 } from "./services/ingestion.service.js";
 
 const app = express();
 
 app.use(express.json());
 
-app.get("/api/health", (_req, res) => {
-  res.status(200).json({
-    status: "ok",
-    service: "ingestion-service",
-  });
-});
+app.get(
+  "/api/health",
+  (_req, res) => {
+    res.status(200).json({
+      status: "ok",
+      service: "ingestion-service",
+    });
+  },
+);
+
 
 app.post(
   "/internal/ingest",
@@ -63,6 +68,45 @@ app.post(
   },
 );
 
+
+app.get(
+  "/internal/repositories/:repositoryId/status",
+  async (req, res) => {
+    try {
+      const {
+        repositoryId,
+      } = req.params;
+
+      const metadata =
+        await getRepositoryAnalysisMetadata(
+          repositoryId,
+        );
+
+      if (!metadata) {
+        return res.status(404).json({
+          message:
+            "Repository metadata not found",
+        });
+      }
+
+      return res.status(200).json(
+        metadata,
+      );
+    } catch (error) {
+      console.error(
+        "Repository metadata retrieval failed",
+        error,
+      );
+
+      return res.status(500).json({
+        message:
+          "Repository metadata retrieval failed",
+      });
+    }
+  },
+);
+
+
 app.get(
   "/internal/repository-index/:repositoryId",
   async (req, res) => {
@@ -95,6 +139,7 @@ app.get(
     }
   },
 );
+
 
 app.get(
   "/internal/repositories/:repositoryId/files",
@@ -147,6 +192,7 @@ app.get(
     }
   },
 );
+
 
 app.get(
   "/internal/repositories/:repositoryId/files/context",

@@ -33,10 +33,7 @@ function fileKey(repositoryId: string, filePath: string): string {
   return `${repositoryPrefix(repositoryId)}/files/${normalizedPath}`;
 }
 
-async function putJson(
-  key: string,
-  value: unknown,
-): Promise<void> {
+async function putJson(key: string, value: unknown): Promise<void> {
   await s3.send(
     new PutObjectCommand({
       Bucket: S3_BUCKET,
@@ -133,10 +130,7 @@ export async function saveRepositoryTree(
   repositoryId: string,
   tree: RepositoryTreeNode,
 ): Promise<void> {
-  await putJson(
-    `${repositoryPrefix(repositoryId)}/tree.json`,
-    tree,
-  );
+  await putJson(`${repositoryPrefix(repositoryId)}/tree.json`, tree);
 
   console.log(`[S3] Repository tree saved: ${repositoryId}`);
 }
@@ -178,17 +172,29 @@ export async function saveArchitectureMap(
     architectureMap,
   );
 
-  console.log(
-    `[S3] Architecture map saved: ${repositoryId}`,
-  );
+  console.log(`[S3] Architecture map saved: ${repositoryId}`);
 }
 
 export async function getArchitectureMap<T = unknown>(
   repositoryId: string,
 ): Promise<T | null> {
-  return getJson<T>(
-    `${repositoryPrefix(repositoryId)}/architecture.json`,
-  );
+  return getJson<T>(`${repositoryPrefix(repositoryId)}/architecture.json`);
+}
+
+export type AnalysisPhase =
+  | "repository_mapping"
+  | "ai_preparation"
+  | "completed"
+  | "failed";
+
+export type AnalysisPhaseStatus = "running" | "completed" | "failed";
+
+export interface AnalysisCapabilities {
+  overview: boolean;
+  architecture: boolean;
+  source: boolean;
+  qa: boolean;
+  navigation: boolean;
 }
 
 export interface RepositoryMetadata {
@@ -201,7 +207,10 @@ export interface RepositoryMetadata {
     | "embedding"
     | "completed"
     | "failed";
+  phase: AnalysisPhase;
+  phaseStatus: AnalysisPhaseStatus;
   progress: number;
+  capabilities: AnalysisCapabilities;
   updatedAt: string;
 }
 
