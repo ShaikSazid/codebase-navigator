@@ -27,28 +27,37 @@ const features = [
 
 function FeaturePreview() {
   return (
-    <section className="mx-auto max-w-6xl px-6 pb-32">
-      <div className="grid gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/10 sm:grid-cols-2 lg:grid-cols-4">
+    <section id="features" className="mx-auto max-w-6xl px-6 pb-32">
+      <div className="mb-10 flex items-end justify-between border-b border-[#231F1B]/10 pb-6">
+        <h2 className="font-['Fraunces'] text-2xl text-[#231F1B]">
+          What it does
+        </h2>
+        <span className="hidden font-mono text-[11px] text-[#6B6255]/50 sm:block">
+          04 capabilities
+        </span>
+      </div>
+
+      <div className="grid gap-px overflow-hidden rounded-2xl border border-[#231F1B]/10 bg-[#231F1B]/[0.06] sm:grid-cols-2 lg:grid-cols-4">
         {features.map((feature) => (
           <div
             key={feature.number}
-            className="group bg-[#080808] p-7 transition hover:bg-white/[0.04]"
+            className="group bg-[#FDFBF6] p-7 transition-colors duration-300 hover:bg-[#F7F2E7]"
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs text-white/25">
+              <span className="font-['Fraunces'] text-xs italic text-[#6B6255]/50">
                 {feature.number}
               </span>
 
-              <span className="text-white/20 transition group-hover:text-violet-400">
+              <span className="text-[#6B6255]/30 transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-[#BC5B31]">
                 ↗
               </span>
             </div>
 
-            <h3 className="mt-12 text-lg font-medium">
+            <h3 className="mt-12 font-['Fraunces'] text-lg text-[#231F1B]">
               {feature.title}
             </h3>
 
-            <p className="mt-3 text-sm leading-6 text-white/40">
+            <p className="mt-3 text-sm leading-6 text-[#6B6255]">
               {feature.description}
             </p>
           </div>
