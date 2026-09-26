@@ -1,5 +1,11 @@
-import { useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
 import { useNavigate } from "react-router-dom";
+
 import {
   analyzeRepository,
   getRepositoryStatus,
@@ -9,47 +15,116 @@ import {
 function Hero() {
   const navigate = useNavigate();
 
-  const [repositoryUrl, setRepositoryUrl] = useState("");
-  const [jobId, setJobId] = useState<string | null>(null);
+  const [repositoryUrl, setRepositoryUrl] =
+    useState("");
+
+  const [jobId, setJobId] =
+    useState<string | null>(null);
+
   const [status, setStatus] =
-    useState<RepositoryAnalysisStatus | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+    useState<RepositoryAnalysisStatus | null>(
+      null,
+    );
+
+  const [error, setError] =
+    useState<string | null>(null);
+
+  const [isAnalyzing, setIsAnalyzing] =
+    useState(false);
+
+  const [progress, setProgress] =
+    useState(0);
+
+  const [phase, setPhase] =
+    useState<string | null>(null);
+
+  const pollingRef =
+    useRef<ReturnType<typeof setTimeout> | null>(
+      null,
+    );
+
+  const hasNavigatedRef =
+    useRef(false);
+
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearTimeout(
+          pollingRef.current,
+        );
+      }
+    };
+  }, []);
 
   async function pollRepositoryStatus(
     analysisJobId: string,
   ) {
     try {
-      const job = await getRepositoryStatus(
-        analysisJobId,
-      );
+      const job =
+        await getRepositoryStatus(
+          analysisJobId,
+        );
 
       setStatus(job.status);
+      setProgress(job.progress ?? 0);
+      setPhase(job.phase ?? null);
 
-      if (job.status === "processing") {
-        setTimeout(() => {
-          pollRepositoryStatus(analysisJobId);
-        }, 1000);
+      const phaseOneReady =
+        Boolean(
+          job.capabilities?.overview &&
+            job.capabilities?.architecture &&
+            job.capabilities?.source,
+        );
 
-        return;
-      }
+      if (
+        phaseOneReady &&
+        !hasNavigatedRef.current
+      ) {
+        hasNavigatedRef.current =
+          true;
 
-      if (job.status === "queued") {
-        setTimeout(() => {
-          pollRepositoryStatus(analysisJobId);
-        }, 1000);
-
-        return;
-      }
-
-      if (job.status === "completed") {
         setIsAnalyzing(false);
 
-        navigate(`/analysis/${analysisJobId}`, {
-          state: {
-            repositoryUrl,
+        if (pollingRef.current) {
+          clearTimeout(
+            pollingRef.current,
+          );
+        }
+
+        navigate(
+          `/analysis/${analysisJobId}`,
+          {
+            state: {
+              repositoryUrl,
+            },
           },
-        });
+        );
+
+        return;
+      }
+
+      if (
+        job.status === "processing" ||
+        job.status === "queued"
+      ) {
+        pollingRef.current =
+          setTimeout(() => {
+            void pollRepositoryStatus(
+              analysisJobId,
+            );
+          }, 1000);
+
+        return;
+      }
+
+      if (
+        job.status === "failed"
+      ) {
+        setError(
+          "Repository analysis failed.",
+        );
+
+        setIsAnalyzing(false);
 
         return;
       }
@@ -76,19 +151,33 @@ function Hero() {
     }
 
     try {
+      if (pollingRef.current) {
+        clearTimeout(
+          pollingRef.current,
+        );
+      }
+
+      hasNavigatedRef.current =
+        false;
+
       setIsAnalyzing(true);
       setError(null);
       setJobId(null);
       setStatus(null);
+      setProgress(0);
+      setPhase(null);
 
-      const result = await analyzeRepository(
-        repositoryUrl.trim(),
-      );
+      const result =
+        await analyzeRepository(
+          repositoryUrl.trim(),
+        );
 
       setJobId(result.jobId);
       setStatus(result.status);
 
-      pollRepositoryStatus(result.jobId);
+      await pollRepositoryStatus(
+        result.jobId,
+      );
     } catch (error) {
       console.error(error);
 
@@ -103,28 +192,25 @@ function Hero() {
   return (
     <section className="flex flex-1 items-center justify-center px-6 pb-8">
       <div className="flex w-full max-w-4xl flex-col items-center text-center">
-        {/* Label */}
         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/50">
           <span className="h-1.5 w-1.5 rounded-full bg-violet-400" />
           AI-powered codebase intelligence
         </div>
 
-        {/* Heading */}
         <h1 className="text-5xl font-semibold tracking-tight sm:text-6xl">
           Understand any codebase.
+
           <span className="block bg-gradient-to-r from-violet-400 to-blue-400 bg-clip-text text-transparent">
             Before you touch the code.
           </span>
         </h1>
 
-        {/* Description */}
         <p className="mt-4 max-w-xl text-sm leading-6 text-white/40 sm:text-base">
           Analyze a GitHub repository and discover how
           its architecture, files, and dependencies fit
           together.
         </p>
 
-        {/* Repository input */}
         <div className="mt-6 flex w-full max-w-2xl flex-col gap-2 sm:flex-row">
           <div className="flex flex-1 items-center rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 transition focus-within:border-violet-400/40">
             <span className="mr-3 text-white/30">
@@ -135,11 +221,15 @@ function Hero() {
               type="url"
               value={repositoryUrl}
               onChange={(event) =>
-                setRepositoryUrl(event.target.value)
+                setRepositoryUrl(
+                  event.target.value,
+                )
               }
               onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  handleAnalyze();
+                if (
+                  event.key === "Enter"
+                ) {
+                  void handleAnalyze();
                 }
               }}
               placeholder="Paste a GitHub repository URL..."
@@ -150,69 +240,78 @@ function Hero() {
 
           <button
             type="button"
-            onClick={handleAnalyze}
+            onClick={() =>
+              void handleAnalyze()
+            }
             disabled={isAnalyzing}
             className="rounded-xl bg-white px-6 py-3 text-sm font-medium text-black transition hover:bg-white/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isAnalyzing ? "Analyzing..." : "Analyze →"}
+            {isAnalyzing
+              ? "Analyzing..."
+              : "Analyze →"}
           </button>
         </div>
 
-        {/* Error */}
         {error && (
           <p className="mt-3 text-xs text-red-400">
             {error}
           </p>
         )}
 
-        {/* Analysis status */}
-        {jobId && status && !error && (
-          <div className="mt-4 flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2 text-xs">
-            {status === "processing" && (
-              <>
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-violet-400" />
+        {jobId &&
+          status &&
+          !error && (
+            <div className="mt-4 flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2 text-xs">
+              {status ===
+                "processing" && (
+                <>
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-violet-400" />
 
-                <span className="text-white/50">
-                  Analyzing repository...
-                </span>
-              </>
-            )}
+                  <span className="text-white/50">
+                    {phase ===
+                    "ai_preparation"
+                      ? `Preparing AI knowledge... ${progress}%`
+                      : `Mapping repository... ${progress}%`}
+                  </span>
+                </>
+              )}
 
-            {status === "queued" && (
-              <>
-                <span className="h-1.5 w-1.5 rounded-full bg-yellow-400" />
+              {status === "queued" && (
+                <>
+                  <span className="h-1.5 w-1.5 rounded-full bg-yellow-400" />
 
-                <span className="text-white/50">
-                  Analysis queued...
-                </span>
-              </>
-            )}
+                  <span className="text-white/50">
+                    Analysis queued...
+                  </span>
+                </>
+              )}
 
-            {status === "completed" && (
-              <>
-                <span className="text-green-400">
-                  ✓
-                </span>
+              {status ===
+                "completed" && (
+                <>
+                  <span className="text-green-400">
+                    ✓
+                  </span>
 
-                <span className="text-white/50">
-                  Analysis completed
-                </span>
-              </>
-            )}
+                  <span className="text-white/50">
+                    Analysis completed
+                  </span>
+                </>
+              )}
 
-            {status === "failed" && (
-              <>
-                <span className="text-red-400">
-                  ×
-                </span>
+              {status === "failed" && (
+                <>
+                  <span className="text-red-400">
+                    ×
+                  </span>
 
-                <span className="text-white/50">
-                  Analysis failed
-                </span>
-              </>
-            )}
-          </div>
-        )}
+                  <span className="text-white/50">
+                    Analysis failed
+                  </span>
+                </>
+              )}
+            </div>
+          )}
 
         {!error && !jobId && (
           <p className="mt-2 text-xs text-white/20">
@@ -220,9 +319,7 @@ function Hero() {
           </p>
         )}
 
-        {/* Product preview */}
         <div className="mt-7 w-full max-w-3xl overflow-hidden rounded-2xl border border-white/10 bg-[#090909] text-left shadow-2xl shadow-black/40">
-          {/* Window header */}
           <div className="flex h-9 items-center border-b border-white/5 px-4">
             <div className="flex gap-1.5">
               <span className="h-2 w-2 rounded-full bg-white/10" />
@@ -235,9 +332,7 @@ function Hero() {
             </div>
           </div>
 
-          {/* Preview body */}
           <div className="flex h-40 sm:h-44">
-            {/* Sidebar */}
             <div className="hidden w-36 border-r border-white/5 p-3 sm:block">
               <div className="mb-3 text-[9px] font-medium text-white/30">
                 PROJECT
@@ -248,14 +343,24 @@ function Hero() {
                   ◈ Overview
                 </div>
 
-                <div>◇ Architecture</div>
-                <div>◇ Files</div>
-                <div>◇ Dependencies</div>
-                <div>◇ Ask AI</div>
+                <div>
+                  ◇ Architecture
+                </div>
+
+                <div>
+                  ◇ Files
+                </div>
+
+                <div>
+                  ◇ Dependencies
+                </div>
+
+                <div>
+                  ◇ Ask AI
+                </div>
               </div>
             </div>
 
-            {/* Architecture */}
             <div className="flex flex-1 flex-col p-4">
               <div className="mb-3">
                 <div className="text-xs font-medium text-white/70">

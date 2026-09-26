@@ -3,38 +3,27 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import logger from "../logger/index.js";
-
 import { Job } from "bullmq";
-
 import axios from "axios";
 
 import { repositoryIngestionQueue } from "../queue/ingestion.queue.js";
 
-type ArchitectureMap =
-  | {
-      type: "structured";
-      layers: Array<{
-        name: string;
-        description: string;
-        files: string[];
-      }>;
-      summary: string;
-    }
-  | {
-      type: "importance-ranked";
-      rankedFiles: Array<{
-        path: string;
-        importanceScore: number;
-        reason: string;
-      }>;
-      summary: string;
-    };
+type ArchitectureMap = {
+  repositoryId?: string;
+  repositoryName?: string;
+  summary?: string;
+  layers?: unknown[];
+  relationships?: unknown[];
+  entryPoints?: unknown[];
+  [key: string]: unknown;
+};
 
 type RepositoryTreeNode = {
   name: string;
-  path: string;
-  type: "folder" | "file";
+  path?: string;
+  type?: string;
   children?: RepositoryTreeNode[];
+  [key: string]: unknown;
 };
 
 type AnalysisPhase =
@@ -59,7 +48,6 @@ type AnalysisCapabilities = {
 type RepositoryMetadata = {
   repositoryId: string;
   url: string;
-
   status:
     | "queued"
     | "indexing"
@@ -67,26 +55,26 @@ type RepositoryMetadata = {
     | "embedding"
     | "completed"
     | "failed";
-
   phase: AnalysisPhase;
-
   phaseStatus: AnalysisPhaseStatus;
-
   progress: number;
-
   capabilities: AnalysisCapabilities;
-
   updatedAt: string;
 };
 
-/* -------------------------------------------------------------------------- */
-/* Create repository analysis job                                             */
-/* -------------------------------------------------------------------------- */
+type RepositoryAnalysisResult = {
+  architectureMap?: ArchitectureMap;
+  repositoryTree?: RepositoryTreeNode;
+};
+
+const INGESTION_SERVICE_URL =
+  process.env.INGESTION_SERVICE_URL ||
+  "http://localhost:5001";
 
 export async function createRepositoryAnalysis(
   url: string,
 ) {
-  const jobId =
+  const repositoryId =
     crypto.randomUUID();
 
   const job =
@@ -94,10 +82,10 @@ export async function createRepositoryAnalysis(
       "repository-analysis",
       {
         url,
-        repositoryId: jobId,
+        repositoryId,
       },
       {
-        jobId,
+        jobId: repositoryId,
         removeOnComplete: false,
         removeOnFail: false,
       },
@@ -105,9 +93,9 @@ export async function createRepositoryAnalysis(
 
   logger.info(
     {
-      jobId,
-      repositoryUrl: url,
-      status: "queued",
+      jobId: job.id,
+      repositoryId,
+      url,
     },
     "Repository analysis job created",
   );
@@ -116,14 +104,11 @@ export async function createRepositoryAnalysis(
     message:
       "Repository analysis started",
     jobId: job.id,
+    repositoryId,
     url,
-    status: "queued",
+    status: "queued" as const,
   };
 }
-
-/* -------------------------------------------------------------------------- */
-/* Get repository analysis status                                             */
-/* -------------------------------------------------------------------------- */
 
 export async function getRepositoryAnalysis(
   jobId: string,
@@ -133,14 +118,6 @@ export async function getRepositoryAnalysis(
       repositoryIngestionQueue,
       jobId,
     );
-
-  logger.info(
-    {
-      jobId,
-      found: Boolean(job),
-    },
-    "Repository analysis job lookup",
-  );
 
   if (!job) {
     return null;
@@ -155,51 +132,28 @@ export async function getRepositoryAnalysis(
     | "completed"
     | "failed";
 
-  switch (state) {
-    case "waiting":
-    case "delayed":
-      status = "queued";
-      break;
-
-    case "active":
-      status = "processing";
-      break;
-
-    case "completed":
-      status = "completed";
-      break;
-
-    case "failed":
-      status = "failed";
-      break;
-
-    default:
-      status = "queued";
+  if (state === "completed") {
+    status = "completed";
+  } else if (state === "failed") {
+    status = "failed";
+  } else if (
+    state === "waiting" ||
+    state === "delayed"
+  ) {
+    status = "queued";
+  } else {
+    status = "processing";
   }
-
-  /* ------------------------------------------------------------------------ */
-  /* Get persistent metadata from ingestion service                           */
-  /* ------------------------------------------------------------------------ */
 
   const metadata =
     await getRepositoryMetadata(
-      jobId,
+      job.data.repositoryId,
     );
 
   const result =
     job.returnvalue as
-      | {
-          architectureMap?: ArchitectureMap;
-          repositoryTree?: RepositoryTreeNode;
-        }
+      | RepositoryAnalysisResult
       | undefined;
-
-  /*
-   * BullMQ tells us the state of the background job.
-   *
-   * S3 metadata tells us the actual repository-analysis phase
-   * and which frontend capabilities are currently available.
-   */
 
   const response: Record<
     string,
@@ -209,10 +163,6 @@ export async function getRepositoryAnalysis(
     url: job.data.url,
     status,
   };
-
-  /* ------------------------------------------------------------------------ */
-  /* Metadata available                                                       */
-  /* ------------------------------------------------------------------------ */
 
   if (metadata) {
     response.phase =
@@ -229,53 +179,116 @@ export async function getRepositoryAnalysis(
 
     response.updatedAt =
       metadata.updatedAt;
-  } else if (
-    state !== "waiting" &&
-    state !== "delayed"
-  ) {
-    /*
-     * Fallback for the short period between the job being picked up
-     * and the worker writing metadata to S3.
-     */
+  } else {
     response.progress =
-      job.progress;
+      status === "completed"
+        ? 100
+        : status === "processing"
+          ? 50
+          : 0;
   }
 
-  /* ------------------------------------------------------------------------ */
-  /* Completed job                                                            */
-  /* ------------------------------------------------------------------------ */
+  const phaseOneReady =
+    metadata?.capabilities?.overview === true &&
+    metadata?.capabilities?.architecture === true &&
+    metadata?.capabilities?.source === true;
 
-  if (
+  if (phaseOneReady) {
+    const phaseOneData =
+      await getRepositoryPhaseOneData(
+        job.data.repositoryId,
+      );
+
+    if (
+      phaseOneData.architectureMap !==
+      undefined
+    ) {
+      response.architectureMap =
+        phaseOneData.architectureMap;
+    }
+
+    if (
+      phaseOneData.repositoryTree !==
+      undefined
+    ) {
+      response.repositoryTree =
+        phaseOneData.repositoryTree;
+    }
+  } else if (
     state === "completed" &&
     result
   ) {
-    response.architectureMap =
-      result.architectureMap;
+    if (
+      result.architectureMap !==
+      undefined
+    ) {
+      response.architectureMap =
+        result.architectureMap;
+    }
 
-    response.repositoryTree =
-      result.repositoryTree;
+    if (
+      result.repositoryTree !==
+      undefined
+    ) {
+      response.repositoryTree =
+        result.repositoryTree;
+    }
   }
-
-  /* ------------------------------------------------------------------------ */
-  /* Failed job                                                               */
-  /* ------------------------------------------------------------------------ */
 
   if (state === "failed") {
     response.error =
-      job.failedReason;
+      job.failedReason ||
+      "Repository analysis failed";
   }
 
   return response;
 }
 
+async function getRepositoryPhaseOneData(
+  repositoryId: string,
+): Promise<RepositoryAnalysisResult> {
+  const result: RepositoryAnalysisResult =
+    {};
+
+  const [
+    architectureResponse,
+    treeResponse,
+  ] = await Promise.all([
+    axios.get<{
+      architectureMap?: ArchitectureMap;
+    }>(
+      `${INGESTION_SERVICE_URL}/internal/repositories/${repositoryId}/architecture`,
+    ),
+    axios.get<{
+      repositoryTree?: RepositoryTreeNode;
+    }>(
+      `${INGESTION_SERVICE_URL}/internal/repositories/${repositoryId}/tree`,
+    ),
+  ]);
+
+  if (
+    architectureResponse.data
+      ?.architectureMap !== undefined
+  ) {
+    result.architectureMap =
+      architectureResponse.data
+        .architectureMap;
+  }
+
+  if (
+    treeResponse.data?.repositoryTree !==
+    undefined
+  ) {
+    result.repositoryTree =
+      treeResponse.data.repositoryTree;
+  }
+
+  return result;
+}
 
 async function getRepositoryMetadata(
   repositoryId: string,
 ): Promise<RepositoryMetadata | null> {
-  const INGESTION_SERVICE_URL =
-    process.env.INGESTION_SERVICE_URL ||
-    "http://localhost:5001";
-
   try {
     const response =
       await axios.get<RepositoryMetadata>(
@@ -291,27 +304,14 @@ async function getRepositoryMetadata(
       return null;
     }
 
-    logger.warn(
-      {
-        repositoryId,
-        error,
-      },
-      "Unable to retrieve repository metadata",
-    );
-
-    return null;
+    throw error;
   }
 }
-
 
 export async function getRepositoryFile(
   repositoryId: string,
   filePath: string,
 ) {
-  const INGESTION_SERVICE_URL =
-    process.env.INGESTION_SERVICE_URL ||
-    "http://localhost:5001";
-
   const response =
     await axios.get(
       `${INGESTION_SERVICE_URL}/internal/repositories/${repositoryId}/files`,

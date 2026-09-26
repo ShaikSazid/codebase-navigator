@@ -5,6 +5,8 @@ import {
   getRepositoryFileContext,
   ingestRepository,
   getRepositoryIndex,
+  getRepositoryTree,
+  getRepositoryArchitecture,
   getRepositoryAnalysisMetadata,
 } from "./services/ingestion.service.js";
 
@@ -21,7 +23,6 @@ app.get(
     });
   },
 );
-
 
 app.post(
   "/internal/ingest",
@@ -68,7 +69,6 @@ app.post(
   },
 );
 
-
 app.get(
   "/internal/repositories/:repositoryId/status",
   async (req, res) => {
@@ -106,6 +106,79 @@ app.get(
   },
 );
 
+app.get(
+  "/internal/repositories/:repositoryId/tree",
+  async (req, res) => {
+    try {
+      const {
+        repositoryId,
+      } = req.params;
+
+      const tree =
+        await getRepositoryTree(
+          repositoryId,
+        );
+
+      if (!tree) {
+        return res.status(404).json({
+          message:
+            "Repository tree not found",
+        });
+      }
+
+      return res.status(200).json({
+        repositoryTree: tree,
+      });
+    } catch (error) {
+      console.error(
+        "Repository tree retrieval failed",
+        error,
+      );
+
+      return res.status(500).json({
+        message:
+          "Repository tree retrieval failed",
+      });
+    }
+  },
+);
+
+app.get(
+  "/internal/repositories/:repositoryId/architecture",
+  async (req, res) => {
+    try {
+      const {
+        repositoryId,
+      } = req.params;
+
+      const architectureMap =
+        await getRepositoryArchitecture(
+          repositoryId,
+        );
+
+      if (!architectureMap) {
+        return res.status(404).json({
+          message:
+            "Architecture map not found",
+        });
+      }
+
+      return res.status(200).json({
+        architectureMap,
+      });
+    } catch (error) {
+      console.error(
+        "Architecture map retrieval failed",
+        error,
+      );
+
+      return res.status(500).json({
+        message:
+          "Architecture map retrieval failed",
+      });
+    }
+  },
+);
 
 app.get(
   "/internal/repository-index/:repositoryId",
@@ -139,7 +212,6 @@ app.get(
     }
   },
 );
-
 
 app.get(
   "/internal/repositories/:repositoryId/files",
@@ -192,7 +264,6 @@ app.get(
     }
   },
 );
-
 
 app.get(
   "/internal/repositories/:repositoryId/files/context",
