@@ -35,7 +35,6 @@ import {
   Brain,
   GripVertical,
   PanelRightClose,
-  Sparkles,
   CheckCircle2,
   Terminal,
 } from "lucide-react";
@@ -44,16 +43,6 @@ type Tab =
   | "overview"
   | "architecture"
   | "qa";
-
-interface Comet {
-  x: number;
-  y: number;
-  length: number;
-  speedX: number;
-  speedY: number;
-  size: number;
-  opacity: number;
-}
 
 const DEFAULT_EXPLANATION_PANEL_WIDTH = 420;
 const MIN_EXPLANATION_PANEL_WIDTH = 320;

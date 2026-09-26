@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { AlertTriangle, ArrowRight, Brain, ChevronDown, Sparkles } from "lucide-react";
+import { AlertTriangle, Brain, Sparkles } from "lucide-react";
 import type { FileExplanation } from "../lib/explainer.api";
 
 interface ExplanationPanelProps {
