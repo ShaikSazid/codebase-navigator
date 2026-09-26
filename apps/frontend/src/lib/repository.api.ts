@@ -6,6 +6,25 @@ export type RepositoryAnalysisStatus =
   | "completed"
   | "failed";
 
+export type RepositoryAnalysisPhase =
+  | "repository_mapping"
+  | "ai_preparation"
+  | "completed"
+  | "failed";
+
+export type RepositoryPhaseStatus =
+  | "running"
+  | "completed"
+  | "failed";
+
+export interface RepositoryCapabilities {
+  overview: boolean;
+  architecture: boolean;
+  source: boolean;
+  qa: boolean;
+  navigation: boolean;
+}
+
 export interface AnalyzeRepositoryResponse {
   message: string;
   jobId: string;
@@ -42,10 +61,26 @@ export type ArchitectureMap =
       summary: string;
     };
 
+export interface RepositoryTreeNode {
+  name: string;
+  path: string;
+  type: "folder" | "file";
+  children?: RepositoryTreeNode[];
+}
+
 export interface RepositoryAnalysisJob {
   jobId: string;
   url: string;
   status: RepositoryAnalysisStatus;
+
+  phase?: RepositoryAnalysisPhase;
+  phaseStatus?: RepositoryPhaseStatus;
+  progress?: number;
+
+  capabilities?: RepositoryCapabilities;
+
+  updatedAt?: string;
+
   architectureMap?: ArchitectureMap;
   repositoryTree?: RepositoryTreeNode;
 }
@@ -79,21 +114,15 @@ export async function getRepositoryFile(
   repositoryId: string,
   filePath: string,
 ): Promise<RepositoryFile> {
-  const response = await api.get(
-    `/api/repositories/${repositoryId}/files`,
-    {
-      params: {
-        path: filePath,
+  const response =
+    await api.get<RepositoryFile>(
+      `/api/repositories/${repositoryId}/files`,
+      {
+        params: {
+          path: filePath,
+        },
       },
-    },
-  );
+    );
 
   return response.data;
-}
-
-export interface RepositoryTreeNode {
-  name: string;
-  path: string;
-  type: "folder" | "file";
-  children?: RepositoryTreeNode[];
 }

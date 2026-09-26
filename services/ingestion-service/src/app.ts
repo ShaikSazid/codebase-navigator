@@ -5,18 +5,24 @@ import {
   getRepositoryFileContext,
   ingestRepository,
   getRepositoryIndex,
+  getRepositoryTree,
+  getRepositoryArchitecture,
+  getRepositoryAnalysisMetadata,
 } from "./services/ingestion.service.js";
 
 const app = express();
 
 app.use(express.json());
 
-app.get("/api/health", (_req, res) => {
-  res.status(200).json({
-    status: "ok",
-    service: "ingestion-service",
-  });
-});
+app.get(
+  "/api/health",
+  (_req, res) => {
+    res.status(200).json({
+      status: "ok",
+      service: "ingestion-service",
+    });
+  },
+);
 
 app.post(
   "/internal/ingest",
@@ -58,6 +64,117 @@ app.post(
       return res.status(500).json({
         message:
           "Repository ingestion failed",
+      });
+    }
+  },
+);
+
+app.get(
+  "/internal/repositories/:repositoryId/status",
+  async (req, res) => {
+    try {
+      const {
+        repositoryId,
+      } = req.params;
+
+      const metadata =
+        await getRepositoryAnalysisMetadata(
+          repositoryId,
+        );
+
+      if (!metadata) {
+        return res.status(404).json({
+          message:
+            "Repository metadata not found",
+        });
+      }
+
+      return res.status(200).json(
+        metadata,
+      );
+    } catch (error) {
+      console.error(
+        "Repository metadata retrieval failed",
+        error,
+      );
+
+      return res.status(500).json({
+        message:
+          "Repository metadata retrieval failed",
+      });
+    }
+  },
+);
+
+app.get(
+  "/internal/repositories/:repositoryId/tree",
+  async (req, res) => {
+    try {
+      const {
+        repositoryId,
+      } = req.params;
+
+      const tree =
+        await getRepositoryTree(
+          repositoryId,
+        );
+
+      if (!tree) {
+        return res.status(404).json({
+          message:
+            "Repository tree not found",
+        });
+      }
+
+      return res.status(200).json({
+        repositoryTree: tree,
+      });
+    } catch (error) {
+      console.error(
+        "Repository tree retrieval failed",
+        error,
+      );
+
+      return res.status(500).json({
+        message:
+          "Repository tree retrieval failed",
+      });
+    }
+  },
+);
+
+app.get(
+  "/internal/repositories/:repositoryId/architecture",
+  async (req, res) => {
+    try {
+      const {
+        repositoryId,
+      } = req.params;
+
+      const architectureMap =
+        await getRepositoryArchitecture(
+          repositoryId,
+        );
+
+      if (!architectureMap) {
+        return res.status(404).json({
+          message:
+            "Architecture map not found",
+        });
+      }
+
+      return res.status(200).json({
+        architectureMap,
+      });
+    } catch (error) {
+      console.error(
+        "Architecture map retrieval failed",
+        error,
+      );
+
+      return res.status(500).json({
+        message:
+          "Architecture map retrieval failed",
       });
     }
   },

@@ -1,14 +1,8 @@
 import axios from "axios";
 
-import {
-  cloneRepository,
-  cleanupRepository,
-} from "./repository.service.js";
+import { cloneRepository, cleanupRepository } from "./repository.service.js";
 
-import {
-  readRepositoryFiles,
-  type RepositoryFile,
-} from "./file.service.js";
+import { readRepositoryFiles, type RepositoryFile } from "./file.service.js";
 
 import { chunkRepository } from "./chunk-repository.service.js";
 
@@ -31,8 +25,11 @@ import {
   saveRepositoryIndex,
   saveArchitectureMap,
   saveRepositoryMetadata,
+  getRepositoryMetadata,
   getRepositoryFile as getStoredRepositoryFile,
   getRepositoryIndex as getStoredRepositoryIndex,
+  getRepositoryTree as getStoredRepositoryTree,
+  getArchitectureMap as getStoredArchitectureMap,
 } from "./repository-storage.service.js";
 
 import type { RepoFileIndex } from "../types/repo.js";
@@ -54,64 +51,34 @@ export interface RepositoryIngestionJobData {
 }
 
 const AGENT_ORCHESTRATOR_URL =
-  process.env.AGENT_ORCHESTRATOR_URL ||
-  "http://localhost:5003";
+  process.env.AGENT_ORCHESTRATOR_URL || "http://localhost:5003";
 
 export async function indexRepository(
   url: string,
   repositoryId: string,
   repositoryPath: string,
 ): Promise<RepositoryIndexingResult> {
-  const files =
-    await readRepositoryFiles(repositoryPath);
+  const files = await readRepositoryFiles(repositoryPath);
 
-  const repositoryName =
-    extractRepositoryName(url);
+  const repositoryName = extractRepositoryName(url);
 
-  const repositoryTree =
-    buildRepositoryTree(
-      files,
-      repositoryName,
-    );
+  const repositoryTree = buildRepositoryTree(files, repositoryName);
 
   console.log(
-    `Repository tree built: ${
-      repositoryTree.children?.length ?? 0
-    } root entries`,
+    `Repository tree built: ${repositoryTree.children?.length ?? 0} root entries`,
   );
 
-  const repositoryIndex =
-    buildRepositoryIndex(
-      repositoryId,
-      files,
-    );
+  const repositoryIndex = buildRepositoryIndex(repositoryId, files);
 
   console.log(
-    `Repository index built: ${
-      repositoryIndex.files.length
-    } files, ${
-      repositoryIndex.dependencyEdges.length
-    } dependencies`,
+    `Repository index built: ${repositoryIndex.files.length} files, ${repositoryIndex.dependencyEdges.length} dependencies`,
   );
 
-  await saveRepositoryFiles(
-    repositoryId,
-    files,
-  );
+  await saveRepositoryFiles(repositoryId, files);
+  await saveRepositoryTree(repositoryId, repositoryTree);
+  await saveRepositoryIndex(repositoryId, repositoryIndex);
 
-  await saveRepositoryTree(
-    repositoryId,
-    repositoryTree,
-  );
-
-  await saveRepositoryIndex(
-    repositoryId,
-    repositoryIndex,
-  );
-
-  console.log(
-    `Repository Phase 1 data saved to S3: ${repositoryId}`,
-  );
+  console.log(`Repository Phase 1 data saved to S3: ${repositoryId}`);
 
   return {
     files,
@@ -124,25 +91,18 @@ export async function analyzeArchitecture(
   repositoryId: string,
   repositoryIndex: RepoFileIndex,
 ): Promise<unknown> {
-  const mapperResponse =
-    await axios.post(
-      `${AGENT_ORCHESTRATOR_URL}/internal/map`,
-      {
-        repository: repositoryIndex,
-      },
-    );
-
-  const architectureMap =
-    mapperResponse.data.architectureMap;
-
-  await saveArchitectureMap(
-    repositoryId,
-    architectureMap,
+  const mapperResponse = await axios.post(
+    `${AGENT_ORCHESTRATOR_URL}/internal/map`,
+    {
+      repository: repositoryIndex,
+    },
   );
 
-  console.log(
-    `Architecture map saved to S3: ${repositoryId}`,
-  );
+  const architectureMap = mapperResponse.data.architectureMap;
+
+  await saveArchitectureMap(repositoryId, architectureMap);
+
+  console.log(`Architecture map saved to S3: ${repositoryId}`);
 
   return architectureMap;
 }
@@ -151,22 +111,13 @@ export async function generateEmbeddings(
   files: RepositoryFile[],
   repositoryId: string,
 ): Promise<number> {
-  const chunks =
-    chunkRepository(files);
+  const chunks = chunkRepository(files);
 
-  console.log(
-    `Repository chunks created: ${chunks.length}`,
-  );
+  console.log(`Repository chunks created: ${chunks.length}`);
 
-  const storedCount =
-    await embedAndStoreChunks(
-      chunks,
-      repositoryId,
-    );
+  const storedCount = await embedAndStoreChunks(chunks, repositoryId);
 
-  console.log(
-    `Repository embeddings stored: ${storedCount}`,
-  );
+  console.log(`Repository embeddings stored: ${storedCount}`);
 
   return storedCount;
 }
@@ -175,75 +126,70 @@ export async function ingestRepository(
   url: string,
   repositoryId: string,
 ): Promise<IngestionResult> {
-  const repositoryPath =
-    await cloneRepository(url);
+  const repositoryPath = await cloneRepository(url);
 
   try {
-    const indexed =
-      await indexRepository(
-        url,
-        repositoryId,
-        repositoryPath,
-      );
+    const indexed = await indexRepository(
+      url,
+      repositoryId,
+      repositoryPath,
+    );
 
     console.log(
       `Phase 1 completed: repository ${repositoryId} is indexed`,
     );
 
-    const architectureMap =
-      await analyzeArchitecture(
-        repositoryId,
-        indexed.repositoryIndex,
-      );
+    const architectureMap = await analyzeArchitecture(
+      repositoryId,
+      indexed.repositoryIndex,
+    );
 
     console.log(
       `Phase 2 completed: architecture generated for ${repositoryId}`,
     );
 
     try {
-      await generateEmbeddings(
-        indexed.files,
-        repositoryId,
-      );
+      await generateEmbeddings(indexed.files, repositoryId);
 
       console.log(
         `Phase 3 completed: embeddings generated for ${repositoryId}`,
       );
     } catch (error) {
-      console.error(
-        "Repository embedding failed",
-        error,
-      );
+      console.error("Repository embedding failed", error);
     }
 
     return {
       architectureMap,
-      repositoryTree:
-        indexed.repositoryTree,
+      repositoryTree: indexed.repositoryTree,
     };
   } finally {
-    await cleanupRepository(
-      repositoryPath,
-    );
+    await cleanupRepository(repositoryPath);
   }
 }
 
 export async function getRepositoryIndex(
   repositoryId: string,
 ): Promise<RepoFileIndex | null> {
-  return getStoredRepositoryIndex(
-    repositoryId,
-  );
+  return getStoredRepositoryIndex(repositoryId);
+}
+
+export async function getRepositoryTree(
+  repositoryId: string,
+): Promise<RepositoryTreeNode | null> {
+  return getStoredRepositoryTree(repositoryId);
+}
+
+export async function getRepositoryArchitecture(
+  repositoryId: string,
+): Promise<unknown | null> {
+  return getStoredArchitectureMap(repositoryId);
 }
 
 export async function getRepositoryFile(
   repositoryId: string,
   filePath: string,
 ): Promise<RepositoryFile | null> {
-  return getStoredRepositoryFile(
-    repositoryId,
-    filePath,
-  );
+  return getStoredRepositoryFile(repositoryId, filePath);
 }
 
 export async function getRepositoryFileContext(
@@ -251,103 +197,118 @@ export async function getRepositoryFileContext(
   filePath: string,
 ): Promise<RepositoryFileContext | null> {
   const repositoryIndex =
-    await getStoredRepositoryIndex(
-      repositoryId,
-    );
+    await getStoredRepositoryIndex(repositoryId);
 
   if (!repositoryIndex) {
     return null;
   }
 
-  return getIndexedFileContext(
-    repositoryIndex,
-    filePath,
-  );
+  return getIndexedFileContext(repositoryIndex, filePath);
 }
 
-function extractRepositoryName(
-  url: string,
-): string {
+export async function getRepositoryAnalysisMetadata(
+  repositoryId: string,
+) {
+  return getRepositoryMetadata(repositoryId);
+}
+
+function extractRepositoryName(url: string): string {
   const cleanedUrl = url
     .replace(/\/+$/, "")
     .replace(/\.git$/, "");
 
-  const parts =
-    cleanedUrl.split("/");
+  const parts = cleanedUrl.split("/");
 
-  return (
-    parts[parts.length - 1] ||
-    "Repository"
-  );
+  return parts[parts.length - 1] || "Repository";
 }
 
 export async function processRepositoryIngestion(
   data: RepositoryIngestionJobData,
-  onProgress?: (
-    progress: number,
-  ) => Promise<void> | void,
+  onProgress?: (progress: number) => Promise<void> | void,
 ): Promise<IngestionResult> {
-  const {
-    url,
-    repositoryId,
-  } = data;
+  const { url, repositoryId } = data;
 
-  const repositoryPath =
-    await cloneRepository(url);
+  const repositoryPath = await cloneRepository(url);
 
   try {
     await saveRepositoryMetadata({
       repositoryId,
       url,
       status: "indexing",
+      phase: "repository_mapping",
+      phaseStatus: "running",
       progress: 10,
-      updatedAt:
-        new Date().toISOString(),
+      capabilities: {
+        overview: false,
+        architecture: false,
+        source: false,
+        qa: false,
+        navigation: false,
+      },
+      updatedAt: new Date().toISOString(),
     });
 
     await onProgress?.(10);
 
-    const indexed =
-      await indexRepository(
-        url,
-        repositoryId,
-        repositoryPath,
-      );
+    const indexed = await indexRepository(
+      url,
+      repositoryId,
+      repositoryPath,
+    );
 
     await saveRepositoryMetadata({
       repositoryId,
       url,
       status: "architecture",
+      phase: "repository_mapping",
+      phaseStatus: "running",
       progress: 30,
-      updatedAt:
-        new Date().toISOString(),
+      capabilities: {
+        overview: true,
+        architecture: false,
+        source: true,
+        qa: false,
+        navigation: false,
+      },
+      updatedAt: new Date().toISOString(),
     });
 
     await onProgress?.(30);
 
     console.log(
-      `Phase 1 completed: repository ${repositoryId} is indexed`,
+      `Repository mapping/indexing completed: ${repositoryId}`,
     );
 
-    const architectureMap =
-      await analyzeArchitecture(
-        repositoryId,
-        indexed.repositoryIndex,
-      );
+    const architectureMap = await analyzeArchitecture(
+      repositoryId,
+      indexed.repositoryIndex,
+    );
 
     await saveRepositoryMetadata({
       repositoryId,
       url,
       status: "embedding",
-      progress: 60,
-      updatedAt:
-        new Date().toISOString(),
+      phase: "ai_preparation",
+      phaseStatus: "running",
+      progress: 50,
+      capabilities: {
+        overview: true,
+        architecture: true,
+        source: true,
+        qa: false,
+        navigation: false,
+      },
+      updatedAt: new Date().toISOString(),
     });
 
-    await onProgress?.(60);
+    await onProgress?.(50);
 
     console.log(
-      `Phase 2 completed: architecture generated for ${repositoryId}`,
+      `Phase 1 completed: repository ${repositoryId} is ready for exploration`,
+    );
+
+    console.log(
+      `Phase 2 started: generating embeddings for ${repositoryId}`,
     );
 
     await generateEmbeddings(
@@ -359,36 +320,49 @@ export async function processRepositoryIngestion(
       repositoryId,
       url,
       status: "completed",
+      phase: "completed",
+      phaseStatus: "completed",
       progress: 100,
-      updatedAt:
-        new Date().toISOString(),
+      capabilities: {
+        overview: true,
+        architecture: true,
+        source: true,
+        qa: true,
+        navigation: true,
+      },
+      updatedAt: new Date().toISOString(),
     });
 
     await onProgress?.(100);
 
     console.log(
-      `Phase 3 completed: embeddings generated for ${repositoryId}`,
+      `Phase 2 completed: AI knowledge preparation finished for ${repositoryId}`,
     );
 
     return {
       architectureMap,
-      repositoryTree:
-        indexed.repositoryTree,
+      repositoryTree: indexed.repositoryTree,
     };
   } catch (error) {
     await saveRepositoryMetadata({
       repositoryId,
       url,
       status: "failed",
+      phase: "failed",
+      phaseStatus: "failed",
       progress: 0,
-      updatedAt:
-        new Date().toISOString(),
+      capabilities: {
+        overview: false,
+        architecture: false,
+        source: false,
+        qa: false,
+        navigation: false,
+      },
+      updatedAt: new Date().toISOString(),
     });
 
     throw error;
   } finally {
-    await cleanupRepository(
-      repositoryPath,
-    );
+    await cleanupRepository(repositoryPath);
   }
 }

@@ -13,9 +13,13 @@ import {
 import {
   getRepositoryStatus,
   getRepositoryFile,
+  type RepositoryAnalysisStatus,
   type ArchitectureMap,
   type RepositoryTreeNode,
   type RepositoryFile,
+  type RepositoryCapabilities,
+  type RepositoryAnalysisPhase,
+  type RepositoryPhaseStatus,
 } from "../lib/repository.api";
 
 import {
@@ -161,6 +165,27 @@ export default function AnalysisPage() {
 
   const [tab, setTab] =
     useState<Tab>("overview");
+
+  const [analysisStatus, setAnalysisStatus] =
+    useState<RepositoryAnalysisStatus | null>(null);
+
+  const [analysisPhase, setAnalysisPhase] =
+    useState<RepositoryAnalysisPhase | null>(null);
+
+  const [, setPhaseStatus] =
+    useState<RepositoryPhaseStatus | null>(null);
+
+  const [analysisProgress, setAnalysisProgress] =
+    useState(0);
+
+  const [capabilities, setCapabilities] =
+    useState<RepositoryCapabilities>({
+      overview: false,
+      architecture: false,
+      source: false,
+      qa: false,
+      navigation: false,
+    });
 
   /* ------------------------------------------------------------------------ */
   /* Dynamic Minimal Starfield & Rare Cosmic Events                          */
@@ -671,63 +696,106 @@ export default function AnalysisPage() {
       return;
     }
 
-    const analysisJobId =
-      jobId;
+    const analysisJobId = jobId;
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
-    async function loadAnalysis() {
+    async function pollAnalysisStatus() {
       try {
         const job =
           await getRepositoryStatus(
             analysisJobId,
           );
 
-        if (
-          job.status !==
-          "completed"
-        ) {
-          setError(
-            "Repository analysis is not completed yet.",
-          );
-
-          setIsLoading(false);
-
+        if (cancelled) {
           return;
         }
 
-        if (
-          !job.architectureMap
-        ) {
-          setError(
-            "Architecture analysis is not available.",
+        setAnalysisStatus(job.status);
+        setAnalysisPhase(job.phase ?? null);
+        setPhaseStatus(job.phaseStatus ?? null);
+        setAnalysisProgress(job.progress ?? 0);
+
+        if (job.capabilities) {
+          setCapabilities(job.capabilities);
+        }
+
+        const phaseOneReady =
+          Boolean(
+            job.capabilities?.overview &&
+              job.capabilities?.architecture &&
+              job.capabilities?.source,
           );
 
-          setIsLoading(false);
+        if (phaseOneReady) {
+          if (job.architectureMap) {
+            setArchitectureMap(
+              job.architectureMap,
+            );
+          }
 
+          if (job.repositoryTree) {
+            setRepositoryTree(
+              job.repositoryTree,
+            );
+          }
+
+          setIsLoading(false);
+        }
+
+        if (job.status === "failed") {
+          setError(
+            "Repository analysis failed.",
+          );
+          setIsLoading(false);
           return;
         }
 
-        setArchitectureMap(
-          job.architectureMap,
-        );
+        if (job.status === "completed") {
+          if (!phaseOneReady && job.architectureMap) {
+            setArchitectureMap(
+              job.architectureMap,
+            );
+          }
 
-        setRepositoryTree(
-          job.repositoryTree ??
-            null,
-        );
+          if (!phaseOneReady && job.repositoryTree) {
+            setRepositoryTree(
+              job.repositoryTree,
+            );
+          }
 
-        setIsLoading(false);
+          setIsLoading(false);
+          return;
+        }
+
+        timeoutId = setTimeout(
+          pollAnalysisStatus,
+          1500,
+        );
       } catch (err) {
         console.error(err);
 
+        if (cancelled) {
+          return;
+        }
+
         setError(
-          "Unable to load repository analysis.",
+          "Unable to check repository analysis status.",
         );
 
         setIsLoading(false);
       }
     }
 
-    void loadAnalysis();
+    void pollAnalysisStatus();
+
+    return () => {
+      cancelled = true;
+
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, [jobId]);
 
   /* ------------------------------------------------------------------------ */
@@ -1097,28 +1165,91 @@ export default function AnalysisPage() {
                     "architecture",
                     "qa",
                   ] as Tab[]
-                ).map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() =>
-                      setTab(t)
-                    }
-                    className={`rounded-md px-3.5 py-1.5 text-[13px] capitalize transition-all duration-200 ${
-                      tab === t
-                        ? "border border-indigo-400/30 bg-indigo-600/35 text-indigo-100 shadow-[0_0_12px_rgba(99,102,241,0.25)]"
-                        : "text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    {t === "qa"
-                      ? "Q&A"
-                      : t}
-                  </button>
-                ))}
+                ).map((t) => {
+                  const isQALocked =
+                    t === "qa" &&
+                    !(
+                      capabilities.qa &&
+                      capabilities.navigation
+                    );
+
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => {
+                        if (isQALocked) {
+                          return;
+                        }
+
+                        setTab(t);
+                      }}
+                      disabled={isQALocked}
+                      className={`rounded-md px-3.5 py-1.5 text-[13px] capitalize transition-all duration-200 ${
+                        tab === t
+                          ? "border border-indigo-400/30 bg-indigo-600/35 text-indigo-100 shadow-[0_0_12px_rgba(99,102,241,0.25)]"
+                          : isQALocked
+                            ? "cursor-not-allowed text-slate-600"
+                            : "text-slate-400 hover:text-white"
+                      }`}
+                      title={
+                        isQALocked
+                          ? "Q&A and navigation are still being prepared"
+                          : undefined
+                      }
+                    >
+                      {t === "qa"
+                        ? isQALocked
+                          ? "Q&A · locked"
+                          : "Q&A"
+                        : t}
+                    </button>
+                  );
+                })}
               </nav>
             )}
           </div>
         </header>
+
+        {architectureMap && analysisStatus === "processing" && (
+          <div className="border-b border-indigo-400/10 bg-indigo-500/[0.04] px-6 py-2.5">
+            <div className="mx-auto flex max-w-[1400px] items-center gap-3">
+              <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-indigo-400" />
+
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-4">
+                  <p className="truncate text-[12px] text-indigo-200/80">
+                    {analysisPhase === "ai_preparation"
+                      ? "AI knowledge preparation is running in the background."
+                      : "Repository analysis is still running."}
+                  </p>
+
+                  <span className="shrink-0 font-mono text-[11px] text-slate-500">
+                    {Math.min(100, Math.max(0, analysisProgress))}%
+                  </span>
+                </div>
+
+                <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/[0.06]">
+                  <div
+                    className="h-full rounded-full bg-indigo-400/70 transition-all duration-500"
+                    style={{
+                      width: `${Math.min(100, Math.max(0, analysisProgress))}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {architectureMap && analysisStatus === "completed" && (
+          <div className="border-b border-emerald-400/10 bg-emerald-500/[0.03] px-6 py-2">
+            <div className="mx-auto flex max-w-[1400px] items-center gap-2 text-[12px] text-emerald-300/70">
+              <span>✓</span>
+              <span>AI knowledge preparation complete. Q&A and navigation are ready.</span>
+            </div>
+          </div>
+        )}
 
         {/* Content Viewport */}
 
@@ -1131,9 +1262,17 @@ export default function AnalysisPage() {
           }
         >
           {isLoading && (
-            <p className="font-mono text-[14px] text-slate-400">
-              Reading the repository universe…
-            </p>
+            <div className="flex min-h-[40vh] items-center justify-center">
+              <div className="text-center">
+                <div className="mx-auto h-5 w-5 animate-spin rounded-full border-2 border-white/10 border-t-indigo-400" />
+                <p className="mt-4 font-mono text-[13px] text-slate-400">
+                  Mapping the repository…
+                </p>
+                <p className="mt-1 text-[12px] text-slate-600">
+                  Building the file tree and architecture map.
+                </p>
+              </div>
+            </div>
           )}
 
           {error && (
@@ -1438,17 +1577,34 @@ export default function AnalysisPage() {
                 {/* Q&A Tab */}
 
                 {tab === "qa" && (
-                  <QAChat
-                    repositoryId={
-                      jobId ?? ""
-                    }
-                    repositoryTree={
-                      repositoryTree
-                    }
-                    onSelectFile={
-                      handleFileSelect
-                    }
-                  />
+                  capabilities.qa &&
+                  capabilities.navigation ? (
+                    <QAChat
+                      repositoryId={
+                        jobId ?? ""
+                      }
+                      repositoryTree={
+                        repositoryTree
+                      }
+                      onSelectFile={
+                        handleFileSelect
+                      }
+                    />
+                  ) : (
+                    <div className="flex h-[calc(100vh-180px)] items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.02]">
+                      <div className="max-w-md px-6 text-center">
+                        <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-indigo-400/20 bg-indigo-500/10 text-indigo-300">
+                          <Brain className="h-4 w-4" />
+                        </div>
+                        <p className="mt-4 text-[14px] font-medium text-white">
+                          Q&A is still being prepared
+                        </p>
+                        <p className="mt-2 text-[12px] leading-5 text-slate-500">
+                          Semantic indexing and navigation are still running in the background. You can continue exploring the repository while they finish.
+                        </p>
+                      </div>
+                    </div>
+                  )
                 )}
               </>
             )}
