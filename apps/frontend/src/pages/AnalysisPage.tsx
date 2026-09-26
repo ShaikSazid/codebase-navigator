@@ -172,7 +172,7 @@ export default function AnalysisPage() {
   const [analysisPhase, setAnalysisPhase] =
     useState<RepositoryAnalysisPhase | null>(null);
 
-  const [phaseStatus, setPhaseStatus] =
+  const [, setPhaseStatus] =
     useState<RepositoryPhaseStatus | null>(null);
 
   const [analysisProgress, setAnalysisProgress] =
