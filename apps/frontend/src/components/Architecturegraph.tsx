@@ -189,7 +189,7 @@ function layout(
           target: child.id,
           type: "smoothstep",
           animated: depth === 0,
-          style: { stroke: "#334155", strokeWidth: 1.5 },
+          style: { stroke: "#3A3A3A", strokeWidth: 1.5 },
         });
       }
       y = (Math.min(...childYs) + Math.max(...childYs)) / 2;
@@ -234,30 +234,30 @@ interface TreeNodeCardProps {
 function TreeNodeCard({ id, data }: TreeNodeCardProps) {
   const { label, hasChildren, expanded, nodeType, fileCount, isHighlighted, onToggle } = data;
 
-  let cardStyle = "bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700";
+  let cardStyle = "bg-[#1A1A1A] border-[#2A2A2A] text-[#B0B0B0] hover:border-[#3A3A3A]";
   let Icon = Folder;
 
   if (nodeType === "root") {
-    cardStyle = "bg-gradient-to-r from-indigo-600 to-violet-600 border-indigo-400 text-white shadow-lg shadow-indigo-500/25 font-semibold";
+    cardStyle = "bg-[#E0E0E0] border-[#E0E0E0] text-[#121212] shadow-lg shadow-black/40 font-semibold";
     Icon = GitFork;
   } else if (nodeType === "group" || nodeType === "subgroup") {
     cardStyle = expanded 
-      ? "bg-slate-900 border-indigo-500/60 text-slate-100 shadow-md ring-1 ring-indigo-500/30" 
-      : "bg-slate-900/90 border-slate-800 text-slate-200 hover:border-slate-700";
+      ? "bg-[#1A1A1A] border-[#555555] text-[#E0E0E0] shadow-md ring-1 ring-[#3A3A3A]" 
+      : "bg-[#161616] border-[#2A2A2A] text-[#B0B0B0] hover:border-[#3A3A3A]";
     Icon = expanded ? FolderOpen : Folder;
   } else if (nodeType === "desc") {
-    cardStyle = "bg-slate-950/40 border-slate-900 text-slate-400 italic text-[12px]";
+    cardStyle = "bg-[#121212]/60 border-[#242424] text-[#666666] italic text-[12px]";
     Icon = FileText;
   } else if (nodeType === "file") {
-    cardStyle = "bg-slate-950/80 border-slate-800/80 text-cyan-200/90 text-[12px] hover:border-cyan-800/50";
+    cardStyle = "bg-[#121212]/90 border-[#242424] text-[#B0B0B0] text-[12px] hover:border-[#3A3A3A]";
     Icon = FileCode;
   } else if (nodeType === "more") {
-    cardStyle = "bg-indigo-950/30 border-indigo-900/30 text-indigo-400 text-[12px] font-medium";
+    cardStyle = "bg-[#1A1A1A]/60 border-[#2A2A2A] text-[#888888] text-[12px] font-medium";
     Icon = FileCode;
   }
 
   const searchHighlight = isHighlighted 
-    ? "ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-950 scale-105" 
+    ? "ring-2 ring-[#E0E0E0] ring-offset-2 ring-offset-[#121212] scale-105" 
     : "";
 
   return (
@@ -268,7 +268,7 @@ function TreeNodeCard({ id, data }: TreeNodeCardProps) {
     >
       <Handle type="target" position={Position.Left} className="!opacity-0 !w-1" />
 
-      <Icon className={`w-4 h-4 shrink-0 ${nodeType === "root" ? "text-white" : nodeType === "file" ? "text-cyan-400" : "text-indigo-400"}`} />
+      <Icon className={`w-4 h-4 shrink-0 ${nodeType === "root" ? "text-[#121212]" : nodeType === "file" ? "text-[#888888]" : "text-[#B0B0B0]"}`} />
 
       <span className="truncate font-medium text-[13px] tracking-tight flex-1">
         {label}
@@ -276,14 +276,18 @@ function TreeNodeCard({ id, data }: TreeNodeCardProps) {
 
       {/* File count indicator */}
       {hasChildren && fileCount > 0 && nodeType !== "root" && (
-        <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full font-mono">
+        <span className="text-[10px] bg-[#242424] text-[#888888] px-2 py-0.5 rounded-full font-mono">
           {fileCount}
         </span>
       )}
 
       {/* Toggle Arrow */}
       {hasChildren && (
-        <div className="ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-white/5 group-hover:bg-white/15 text-slate-300 transition-colors">
+        <div className={`ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-md transition-colors ${
+          nodeType === "root"
+            ? "bg-black/10 group-hover:bg-black/20 text-[#121212]"
+            : "bg-white/5 group-hover:bg-white/10 text-[#B0B0B0]"
+        }`}>
           {expanded ? (
             <ChevronDown className="w-3.5 h-3.5" />
           ) : (
@@ -350,32 +354,32 @@ function GraphInner({ layers, repositoryLabel }: ArchitectureGraphProps) {
   }, [tree, expanded, toggle, searchQuery, setNodes, setEdges]);
 
   return (
-    <div className="relative w-full h-full bg-[#0B0F17] overflow-hidden rounded-xl border border-slate-800">
-      <div className="absolute top-4 right-4 z-10 flex items-center gap-2 bg-slate-900/90 backdrop-blur-md p-1.5 rounded-lg border border-slate-800 shadow-xl">
+    <div className="relative w-full h-full bg-[#121212] overflow-hidden rounded-xl border border-[#2A2A2A]">
+      <div className="absolute top-4 right-4 z-10 flex items-center gap-2 bg-[#1A1A1A]/90 backdrop-blur-md p-1.5 rounded-lg border border-[#2A2A2A] shadow-xl">
         <div className="relative flex items-center">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+          <Search className="w-3.5 h-3.5 text-[#666666] absolute left-2.5 pointer-events-none" />
           <input
             type="text"
             placeholder="Search files or layers..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-48 bg-slate-950 text-slate-200 text-xs pl-8 pr-3 py-1.5 rounded-md border border-slate-800 focus:outline-none focus:border-indigo-500 transition-colors"
+            className="w-48 bg-[#121212] text-[#E0E0E0] text-xs pl-8 pr-3 py-1.5 rounded-md border border-[#2A2A2A] focus:outline-none focus:border-[#555555] transition-colors duration-300"
           />
         </div>
 
-        <div className="h-4 w-[1px] bg-slate-800" />
+        <div className="h-4 w-[1px] bg-[#2A2A2A]" />
 
         <button
           onClick={expandAll}
           title="Expand All Nodes"
-          className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-md transition-colors"
+          className="p-1.5 text-[#888888] hover:text-[#E0E0E0] hover:bg-[#242424] rounded-md transition-colors duration-300"
         >
           <Maximize2 className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={collapseAll}
           title="Collapse to Root"
-          className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-md transition-colors"
+          className="p-1.5 text-[#888888] hover:text-[#E0E0E0] hover:bg-[#242424] rounded-md transition-colors duration-300"
         >
           <Minimize2 className="w-3.5 h-3.5" />
         </button>
@@ -393,10 +397,10 @@ function GraphInner({ layers, repositoryLabel }: ArchitectureGraphProps) {
         minZoom={0.2}
         maxZoom={1.5}
       >
-        <Background variant={BackgroundVariant.Dots} color="#1E293B" gap={24} size={1} />
+        <Background variant={BackgroundVariant.Dots} color="#242424" gap={24} size={1} />
         <Controls
           showInteractive={false}
-          className="!border-slate-800 !bg-slate-900/90 !backdrop-blur-md !rounded-lg overflow-hidden [&_button]:!border-slate-800 [&_button]:!bg-transparent [&_button]:!fill-slate-300 hover:[&_button]:!bg-slate-800"
+          className="!border-[#2A2A2A] !bg-[#1A1A1A]/90 !backdrop-blur-md !rounded-lg overflow-hidden [&_button]:!border-[#2A2A2A] [&_button]:!bg-transparent [&_button]:!fill-[#B0B0B0] hover:[&_button]:!bg-[#242424]"
         />
       </ReactFlow>
     </div>

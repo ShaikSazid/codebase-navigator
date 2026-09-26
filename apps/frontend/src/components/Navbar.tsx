@@ -1,25 +1,21 @@
 function Navbar() {
   return (
-    <nav className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
-      {/* Logo */}
-      <div className="flex items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5">
-          <span className="text-sm font-semibold text-violet-400">
-            ◈
-          </span>
+    <nav className="flex w-full shrink-0 items-center justify-between px-8 py-7 sm:px-14">
+      <div className="flex items-center gap-2.5">
+        <div className="flex h-7 w-7 items-center justify-center rounded-sm border border-[#444444]">
+          <span className="text-[13px] font-bold text-[#E0E0E0]">◈</span>
         </div>
 
-        <span className="text-sm font-semibold tracking-wide">
+        <span className="text-[13px] font-semibold uppercase tracking-[0.18em] text-[#E0E0E0]">
           Codebase Navigator
         </span>
       </div>
 
-      {/* Navigation */}
       <button
         type="button"
-        className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
+        className="rounded-full border border-[#444444] px-4 py-2 text-[12px] text-[#B0B0B0] transition-colors duration-300 hover:border-[#888888] hover:text-[#E0E0E0]"
       >
-        Sign In
+        Sign in
       </button>
     </nav>
   );

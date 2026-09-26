@@ -190,33 +190,29 @@ function Hero() {
   }
 
   return (
-    <section className="flex flex-1 items-center justify-center px-6 pb-8">
-      <div className="flex w-full max-w-4xl flex-col items-center text-center">
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/50">
-          <span className="h-1.5 w-1.5 rounded-full bg-violet-400" />
-          AI-powered codebase intelligence
+    <section className="relative flex flex-1 flex-col justify-center px-6 sm:px-10">
+      <div className="max-w-3xl -translate-y-6">
+        <div className="mb-5 flex items-center gap-2 text-[11px] uppercase tracking-[0.25em] text-[#888888]">
+          <span className="h-1 w-1 rounded-full bg-[#E0E0E0]" />
+          Introducing
         </div>
 
-        <h1 className="text-5xl font-semibold tracking-tight sm:text-6xl">
-          Understand any codebase.
+        <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
+          <h1 className="text-[44px] font-bold leading-[1.02] tracking-tight text-[#E0E0E0] sm:text-[64px]">
+            Understand
+            <span className="text-[#888888]"> →</span>
+            <br />
+            any codebase.
+          </h1>
 
-          <span className="block bg-gradient-to-r from-violet-400 to-blue-400 bg-clip-text text-transparent">
-            Before you touch the code.
-          </span>
-        </h1>
+          <p className="mb-2 max-w-[220px] text-[13px] leading-5 text-[#888888]">
+            Before you touch the code. AI-mapped architecture, files &amp;
+            dependencies.
+          </p>
+        </div>
 
-        <p className="mt-4 max-w-xl text-sm leading-6 text-white/40 sm:text-base">
-          Analyze a GitHub repository and discover how
-          its architecture, files, and dependencies fit
-          together.
-        </p>
-
-        <div className="mt-6 flex w-full max-w-2xl flex-col gap-2 sm:flex-row">
-          <div className="flex flex-1 items-center rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 transition focus-within:border-violet-400/40">
-            <span className="mr-3 text-white/30">
-              ◇
-            </span>
-
+        <div className="mt-9 flex w-full max-w-xl flex-col gap-2.5 sm:flex-row">
+          <div className="flex flex-1 items-center rounded-lg border border-[#444444] bg-[#1A1A1A] px-4 py-3 transition-colors duration-300 focus-within:border-[#888888]">
             <input
               type="url"
               value={repositoryUrl}
@@ -226,50 +222,40 @@ function Hero() {
                 )
               }
               onKeyDown={(event) => {
-                if (
-                  event.key === "Enter"
-                ) {
+                if (event.key === "Enter") {
                   void handleAnalyze();
                 }
               }}
               placeholder="Paste a GitHub repository URL..."
               disabled={isAnalyzing}
-              className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/25 disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full bg-transparent text-sm text-[#E0E0E0] outline-none placeholder:text-[#888888]/50 disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
 
           <button
             type="button"
-            onClick={() =>
-              void handleAnalyze()
-            }
+            onClick={() => void handleAnalyze()}
             disabled={isAnalyzing}
-            className="rounded-xl bg-white px-6 py-3 text-sm font-medium text-black transition hover:bg-white/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-[#E0E0E0] px-7 py-3 text-sm font-semibold text-[#121212] transition-all duration-300 hover:bg-[#F2F2F2] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isAnalyzing
-              ? "Analyzing..."
-              : "Analyze →"}
+            {isAnalyzing ? "Analyzing…" : "Analyze"}
           </button>
         </div>
 
-        {error && (
-          <p className="mt-3 text-xs text-red-400">
-            {error}
-          </p>
-        )}
+        <div className="mt-4 h-5">
+          {error && (
+            <p className="text-xs text-[#B0B0B0]">
+              {error}
+            </p>
+          )}
 
-        {jobId &&
-          status &&
-          !error && (
-            <div className="mt-4 flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2 text-xs">
-              {status ===
-                "processing" && (
+          {jobId && status && !error && (
+            <div className="flex items-center gap-2 text-xs text-[#888888]">
+              {status === "processing" && (
                 <>
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-violet-400" />
-
-                  <span className="text-white/50">
-                    {phase ===
-                    "ai_preparation"
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#E0E0E0]" />
+                  <span>
+                    {phase === "ai_preparation"
                       ? `Preparing AI knowledge... ${progress}%`
                       : `Mapping repository... ${progress}%`}
                   </span>
@@ -277,23 +263,17 @@ function Hero() {
               )}
 
               {status === "queued" && (
-                <>
-                  <span className="h-1.5 w-1.5 rounded-full bg-yellow-400" />
-
-                  <span className="text-white/50">
-                    Analysis queued...
-                  </span>
-                </>
+                <span>
+                  Analysis queued...
+                </span>
               )}
 
-              {status ===
-                "completed" && (
+              {status === "completed" && (
                 <>
-                  <span className="text-green-400">
+                  <span className="text-[#E0E0E0]">
                     ✓
                   </span>
-
-                  <span className="text-white/50">
+                  <span>
                     Analysis completed
                   </span>
                 </>
@@ -301,11 +281,10 @@ function Hero() {
 
               {status === "failed" && (
                 <>
-                  <span className="text-red-400">
+                  <span className="text-[#B0B0B0]">
                     ×
                   </span>
-
-                  <span className="text-white/50">
+                  <span>
                     Analysis failed
                   </span>
                 </>
@@ -313,108 +292,11 @@ function Hero() {
             </div>
           )}
 
-        {!error && !jobId && (
-          <p className="mt-2 text-xs text-white/20">
-            Start with any public GitHub repository
-          </p>
-        )}
-
-        <div className="mt-7 w-full max-w-3xl overflow-hidden rounded-2xl border border-white/10 bg-[#090909] text-left shadow-2xl shadow-black/40">
-          <div className="flex h-9 items-center border-b border-white/5 px-4">
-            <div className="flex gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-white/10" />
-              <span className="h-2 w-2 rounded-full bg-white/10" />
-              <span className="h-2 w-2 rounded-full bg-white/10" />
-            </div>
-
-            <div className="mx-auto rounded-md bg-white/[0.03] px-16 py-1 text-[9px] text-white/20">
-              codebase-navigator
-            </div>
-          </div>
-
-          <div className="flex h-40 sm:h-44">
-            <div className="hidden w-36 border-r border-white/5 p-3 sm:block">
-              <div className="mb-3 text-[9px] font-medium text-white/30">
-                PROJECT
-              </div>
-
-              <div className="space-y-2 text-[9px] text-white/25">
-                <div className="text-violet-300/70">
-                  ◈ Overview
-                </div>
-
-                <div>
-                  ◇ Architecture
-                </div>
-
-                <div>
-                  ◇ Files
-                </div>
-
-                <div>
-                  ◇ Dependencies
-                </div>
-
-                <div>
-                  ◇ Ask AI
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-1 flex-col p-4">
-              <div className="mb-3">
-                <div className="text-xs font-medium text-white/70">
-                  Architecture
-                </div>
-
-                <div className="mt-1 text-[9px] text-white/25">
-                  Generated from the repository structure
-                </div>
-              </div>
-
-              <div className="flex flex-1 items-center justify-center">
-                <div className="flex items-center gap-2 sm:gap-4">
-                  <div className="rounded-lg border border-violet-400/20 bg-violet-400/[0.06] px-3 py-2">
-                    <div className="text-[9px] text-violet-300/80">
-                      API
-                    </div>
-
-                    <div className="mt-1 text-[8px] text-white/25">
-                      routes
-                    </div>
-                  </div>
-
-                  <div className="text-[10px] text-white/15">
-                    ──→
-                  </div>
-
-                  <div className="rounded-lg border border-blue-400/20 bg-blue-400/[0.06] px-3 py-2">
-                    <div className="text-[9px] text-blue-300/80">
-                      Services
-                    </div>
-
-                    <div className="mt-1 text-[8px] text-white/25">
-                      business logic
-                    </div>
-                  </div>
-
-                  <div className="text-[10px] text-white/15">
-                    ──→
-                  </div>
-
-                  <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
-                    <div className="text-[9px] text-white/60">
-                      Database
-                    </div>
-
-                    <div className="mt-1 text-[8px] text-white/25">
-                      persistence
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          {!error && !jobId && (
+            <p className="text-xs text-[#888888]/50">
+              Start with any public GitHub repository
+            </p>
+          )}
         </div>
       </div>
     </section>
