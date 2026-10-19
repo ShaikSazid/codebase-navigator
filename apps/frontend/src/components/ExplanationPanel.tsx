@@ -33,10 +33,16 @@ export default function ExplanationPanel({
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center p-6 text-center">
-        <div>
-          <Brain className="mx-auto h-5 w-5 animate-pulse text-[#EAE7E0]" />
-          <p className="mt-3 font-mono text-[11px] text-[#726E67]">ANALYZING SOURCE FILE…</p>
+      <div className="flex h-full flex-col gap-4 p-6">
+        <div className="flex items-center gap-2 text-[12px] text-[#9E9A92]">
+          <Brain className="h-4 w-4 animate-pulse text-[#D4A359]" />
+          <span>Analyzing source file…</span>
+        </div>
+        <div className="cn-sheen h-6 w-2/3 rounded-md" />
+        <div className="space-y-2.5">
+          <div className="cn-sheen h-3 w-full rounded-full" />
+          <div className="cn-sheen h-3 w-[90%] rounded-full" />
+          <div className="cn-sheen h-3 w-[70%] rounded-full" />
         </div>
       </div>
     );
@@ -46,9 +52,11 @@ export default function ExplanationPanel({
     return (
       <div className="flex h-full items-center justify-center p-6 text-center">
         <div className="max-w-xs">
-          <AlertTriangle className="mx-auto h-5 w-5 text-[#D4A359]" />
-          <p className="mt-2 text-[13px] font-semibold text-[#EAE7E0]">Analysis Error</p>
-          <p className="mt-1 text-[12px] text-[#9E9A92]">{error}</p>
+          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl border border-[#D4A359]/30 bg-[#D4A359]/10">
+            <AlertTriangle className="h-5 w-5 text-[#D4A359]" />
+          </div>
+          <p className="mt-3 text-[13px] font-semibold text-[#EAE7E0]">Analysis Error</p>
+          <p className="mt-1 text-[12px] leading-5 text-[#9E9A92]">{error}</p>
         </div>
       </div>
     );
@@ -58,53 +66,63 @@ export default function ExplanationPanel({
     return (
       <div className="flex h-full items-center justify-center p-6 text-center">
         <div>
-          <Sparkles className="mx-auto h-5 w-5 text-[#55534F]" />
-          <p className="mt-2 text-[13px] text-[#9E9A92]">Select a file to generate AI insights</p>
+          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl border border-[#232326] bg-[#141417]">
+            <Sparkles className="h-4 w-4 text-[#726E67]" />
+          </div>
+          <p className="mt-3 text-[13px] text-[#9E9A92]">Select a file to generate AI insights</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full flex-col bg-transparent font-sans text-[#EAE7E0]">
-      {/* Drawer Header */}
-      <div className="shrink-0 border-b border-[#232326] p-4">
+    <div className="flex h-full flex-col bg-transparent text-[#EAE7E0]">
+      {/* Header */}
+      <div className="shrink-0 bg-gradient-to-b from-[#D4A359]/[0.06] to-transparent p-5 pb-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 font-mono text-[10px] text-[#726E67]">
-            <Brain className="h-3.5 w-3.5 text-[#EAE7E0]" /> AI INSIGHTS
+          <div className="flex items-center gap-1.5 text-[11.5px] font-medium text-[#D4A359]">
+            <Sparkles className="h-3.5 w-3.5" /> AI insights
           </div>
-          <span className="rounded-full bg-[#18181B] px-2 py-0.5 font-mono text-[9.5px] text-[#9E9A92]">Grounded</span>
+          <span className="rounded-full border border-[#2B2B30] bg-[#18181B] px-2.5 py-0.5 text-[10.5px] text-[#9E9A92]">
+            Grounded in code
+          </span>
         </div>
-        <p className="mt-2 truncate font-mono text-[12px] text-[#EAE7E0]">{explanation.filePath}</p>
-        <p className="mt-1 text-[13px] font-medium text-[#C2C0B8]">{explanation.fileRole}</p>
+        <h3 className="font-display mt-3 text-[26px] leading-[1.15] text-[#EAE7E0]">{explanation.fileRole}</h3>
+        <p className="mt-2 truncate font-mono text-[11.5px] text-[#726E67]" title={explanation.filePath}>
+          {explanation.filePath}
+        </p>
       </div>
 
       {/* Tabs */}
-      <div className="flex shrink-0 gap-1 border-b border-[#232326] px-3 py-1.5">
+      <div className="flex shrink-0 gap-5 border-b border-[#232326] px-5">
         {sections.map((sec) => (
           <button
             key={sec.key}
             type="button"
             onClick={() => setActiveSection(sec.key)}
-            className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
-              activeSection === sec.key ? "bg-[#222226] text-[#EAE7E0]" : "text-[#726E67] hover:text-[#9E9A92]"
+            className={`relative flex items-center gap-1.5 py-2.5 text-[12px] font-medium transition-colors ${
+              activeSection === sec.key ? "text-[#EAE7E0]" : "text-[#726E67] hover:text-[#9E9A92]"
             }`}
           >
             {sec.label}
+            {sec.flag && <span className="h-1.5 w-1.5 rounded-full bg-[#D4A359]" />}
+            {activeSection === sec.key && (
+              <span className="absolute inset-x-0 -bottom-px h-[2px] rounded-full bg-[#D4A359]" />
+            )}
           </button>
         ))}
       </div>
 
-      {/* Content Area */}
-      <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto p-4 space-y-6">
+      {/* Content */}
+      <div key={activeSection} className="cn-rise custom-scrollbar min-h-0 flex-1 space-y-7 overflow-y-auto p-5">
         {activeSection === "overview" && (
           <>
-            <p className="text-[13px] leading-6 text-[#9E9A92]">{explanation.whyExists}</p>
+            <p className="text-[14px] leading-7 text-[#C2C0B8]">{explanation.whyExists}</p>
             <Section title="Responsibilities">
-              <ul className="space-y-2 text-[13px] text-[#C2C0B8]">
+              <ul className="space-y-3 text-[13px] leading-6 text-[#C2C0B8]">
                 {explanation.responsibilities.map((r, i) => (
-                  <li key={i} className="flex gap-2">
-                    <span className="font-mono text-[11px] text-[#726E67]">{i + 1}.</span>
+                  <li key={i} className="flex gap-3">
+                    <span className="mt-2.5 h-px w-3 shrink-0 bg-[#D4A359]" />
                     <span>{r}</span>
                   </li>
                 ))}
@@ -114,18 +132,20 @@ export default function ExplanationPanel({
         )}
 
         {activeSection === "flow" && (
-          <Section title="Data Flow">
-            <p className="whitespace-pre-line font-mono text-[12px] leading-6 text-[#9E9A92]">{explanation.dataFlow}</p>
+          <Section title="Data flow">
+            <p className="whitespace-pre-line rounded-xl border border-[#232326] bg-[#0E0E10] p-4 font-mono text-[12px] leading-6 text-[#9E9A92]">
+              {explanation.dataFlow}
+            </p>
           </Section>
         )}
 
         {activeSection === "concepts" && (
-          <Section title="Key Concepts">
-            <div className="space-y-2">
+          <Section title="Key concepts">
+            <div className="divide-y divide-[#1E1E21] border-y border-[#1E1E21]">
               {explanation.keyConcepts.map((concept, i) => (
-                <div key={i} className="rounded-lg border border-[#232326] bg-[#111113] p-3">
-                  <p className="text-[12.5px] font-medium text-[#EAE7E0]">{concept.name}</p>
-                  <p className="mt-1 text-[12px] text-[#9E9A92]">{concept.explanation}</p>
+                <div key={i} className="py-4">
+                  <p className="text-[13px] font-semibold text-[#EAE7E0]">{concept.name}</p>
+                  <p className="mt-1 text-[12.5px] leading-6 text-[#9E9A92]">{concept.explanation}</p>
                 </div>
               ))}
             </div>
@@ -134,9 +154,11 @@ export default function ExplanationPanel({
 
         {activeSection === "limitations" && (
           <Section title="Ambiguities">
-            <ul className="space-y-1.5 text-[12.5px] text-[#9E9A92]">
+            <ul className="space-y-2.5">
               {explanation.uncertainty.map((item, i) => (
-                <li key={i}>• {item}</li>
+                <li key={i} className="rounded-lg border-l-2 border-[#D4A359]/60 bg-[#D4A359]/[0.05] px-3.5 py-2.5 text-[12.5px] leading-6 text-[#C2C0B8]">
+                  {item}
+                </li>
               ))}
             </ul>
           </Section>
@@ -149,7 +171,7 @@ export default function ExplanationPanel({
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div>
-      <p className="mb-2 font-mono text-[10px] uppercase tracking-wider text-[#726E67]">{title}</p>
+      <p className="mb-3 text-[12px] font-medium text-[#726E67]">{title}</p>
       {children}
     </div>
   );
