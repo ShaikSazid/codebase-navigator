@@ -1,14 +1,5 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
-
-import {
-  useLocation,
-  useParams,
-} from "react-router-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useParams } from "react-router-dom";
 
 import {
   getRepositoryStatus,
@@ -22,31 +13,40 @@ import {
   type RepositoryPhaseStatus,
 } from "../lib/repository.api";
 
-import {
-  explainFile,
-  type FileExplanation,
-} from "../lib/explainer.api";
+import { explainFile, type FileExplanation } from "../lib/explainer.api";
 
 import RepositoryTree from "../components/RepositoryTree";
 import ExplanationPanel from "../components/ExplanationPanel";
 import QAChat from "../components/QAChat";
+import SourceViewer from "../components/Sourceviewer";
 
 import {
   Brain,
   GripVertical,
-  PanelRightClose,
   CheckCircle2,
   Terminal,
+  ChevronRight,
+  Lock,
 } from "lucide-react";
 
-type Tab =
-  | "overview"
-  | "architecture"
-  | "qa";
+type Tab = "overview" | "architecture" | "qa";
 
 const DEFAULT_EXPLANATION_PANEL_WIDTH = 420;
 const MIN_EXPLANATION_PANEL_WIDTH = 320;
 const MAX_EXPLANATION_PANEL_WIDTH = 700;
+
+const STYLE = `
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap');
+.cn-root { font-family: 'Inter', system-ui, sans-serif; }
+.cn-root .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+.cn-root .font-display { font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; }
+@keyframes cn-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.cn-rise { animation: cn-rise .55s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes cn-sheen { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+.cn-sheen { background: linear-gradient(90deg,#1B1B1E 30%,#26262A 50%,#1B1B1E 70%); background-size: 200% 100%; animation: cn-sheen 1.8s linear infinite; }
+:where(.cn-root) button:focus-visible { outline: 2px solid #D4A359; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .cn-rise, .cn-sheen { animation: none; } }
+`;
 
 export default function AnalysisPage() {
   const { jobId } = useParams<{ jobId: string }>();
@@ -121,7 +121,6 @@ export default function AnalysisPage() {
     const render = () => {
       ctx.clearRect(0, 0, width, height);
 
-      // Warm vintage dark background gradient
       const gradient = ctx.createLinearGradient(0, 0, 0, height);
       gradient.addColorStop(0, "#0D0D0E");
       gradient.addColorStop(0.5, "#111113");
@@ -130,7 +129,6 @@ export default function AnalysisPage() {
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, width, height);
 
-      // Subtle vintage background grid line dots
       ctx.fillStyle = "rgba(234, 231, 224, 0.03)";
       for (let x = 0; x < width; x += 32) {
         for (let y = 0; y < height; y += 32) {
@@ -336,30 +334,40 @@ export default function AnalysisPage() {
       ? architectureMap.rankedFiles.length
       : 0;
 
+  const progress = Math.min(100, Math.max(0, analysisProgress));
+  const isProcessing = analysisStatus === "processing";
+  const isDone = analysisStatus === "completed";
+  const maxScore =
+    architectureMap?.type === "importance-ranked"
+      ? Math.max(...architectureMap.rankedFiles.map((f) => f.importanceScore), 0.0001)
+      : 1;
+
   return (
-    <main className={`relative min-h-screen w-full overflow-hidden bg-[#0D0D0E] text-[#EAE7E0] selection:bg-[#EAE7E0]/20 font-sans ${isResizingExplanation ? "select-none" : ""}`}>
+    <main className={`cn-root relative min-h-screen w-full overflow-hidden bg-[#0D0D0E] text-[#EAE7E0] selection:bg-[#D4A359]/25 ${isResizingExplanation ? "select-none" : ""}`}>
+      <style>{STYLE}</style>
       <canvas ref={canvasRef} className="pointer-events-none fixed inset-0 z-0 h-full w-full" />
+      <div className="pointer-events-none fixed inset-x-0 top-0 z-0 h-[360px] bg-[radial-gradient(ellipse_at_50%_-20%,rgba(212,163,89,0.08),transparent_70%)]" />
 
       <div className="relative z-10 flex min-h-screen flex-col">
-        {/* Vintage Instrument Top Navigation Header */}
-        <header className="border-b border-[#232326] bg-[#0F0F12]/80 px-6 py-3.5 backdrop-blur-xl">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#2B2B30] bg-[#161619] shadow-inner">
-                <Terminal className="h-4 w-4 text-[#9E9A92]" />
+        {/* Header */}
+        <header className="sticky top-0 z-20 border-b border-[#232326] bg-[#0D0D0E]/75 backdrop-blur-xl">
+          <div className="flex items-center justify-between gap-6 px-6 py-3">
+            <div className="flex min-w-0 items-center gap-3.5">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#2B2B30] bg-gradient-to-b from-[#1C1C20] to-[#131316]">
+                <Terminal className="h-4 w-4 text-[#D4A359]" />
               </div>
               <div className="min-w-0">
-                <p className="font-mono text-[10px] tracking-wider uppercase text-[#726E67]">
-                  analysis // {jobId}
-                </p>
-                <h1 className="truncate text-[15px] font-semibold tracking-tight text-[#EAE7E0]">
-                  {repositoryLabel}
-                </h1>
+                <div className="flex items-center gap-1.5 font-mono text-[10.5px] text-[#726E67]">
+                  <span>analysis</span>
+                  <ChevronRight className="h-3 w-3" />
+                  <span className="truncate">{jobId}</span>
+                </div>
+                <h1 className="truncate text-[15px] font-semibold tracking-tight">{repositoryLabel}</h1>
               </div>
             </div>
 
             {architectureMap && (
-              <nav className="flex shrink-0 gap-1 rounded-lg border border-[#232326] bg-[#141417] p-1 shadow-sm">
+              <nav className="relative flex shrink-0 gap-0.5 rounded-xl border border-[#232326] bg-[#111113] p-1">
                 {(["overview", "architecture", "qa"] as Tab[]).map((t) => {
                   const isQALocked = t === "qa" && !(capabilities.qa && capabilities.navigation);
                   return (
@@ -368,14 +376,15 @@ export default function AnalysisPage() {
                       type="button"
                       onClick={() => !isQALocked && setTab(t)}
                       disabled={isQALocked}
-                      className={`rounded-md px-3.5 py-1.5 text-[12px] font-medium capitalize transition-all duration-200 ${
+                      className={`flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-[12.5px] font-medium capitalize transition-colors duration-200 ${
                         tab === t
-                          ? "border border-[#38373B] bg-[#222226] text-[#EAE7E0] shadow-[0_1px_3px_rgba(0,0,0,0.4)]"
+                          ? "bg-[#EAE7E0] text-[#0D0D0E] shadow-[0_1px_8px_rgba(234,231,224,0.15)]"
                           : isQALocked
-                          ? "cursor-not-allowed text-[#454340]"
-                          : "border border-transparent text-[#9E9A92] hover:text-[#EAE7E0]"
+                          ? "cursor-not-allowed text-[#4A4845]"
+                          : "text-[#9E9A92] hover:text-[#EAE7E0]"
                       }`}
                     >
+                      {isQALocked && <Lock className="h-3 w-3" />}
                       {t === "qa" ? (isQALocked ? "Q&A · locked" : "Q&A") : t}
                     </button>
                   );
@@ -383,114 +392,143 @@ export default function AnalysisPage() {
               </nav>
             )}
           </div>
+
+          {/* Live progress hairline */}
+          {architectureMap && isProcessing && (
+            <div className="h-[2px] w-full bg-[#1A1A1D]">
+              <div
+                className="h-full bg-gradient-to-r from-[#9E9A92] to-[#D4A359] transition-all duration-700"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          )}
         </header>
 
-        {/* Processing Banner */}
-        {architectureMap && analysisStatus === "processing" && (
-          <div className="border-b border-[#232326] bg-[#141417]/80 px-6 py-2.5 backdrop-blur-md">
-            <div className="mx-auto flex max-w-[1400px] items-center gap-3">
-              <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-[#D4A359]" />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-4">
-                  <p className="truncate text-[12px] text-[#9E9A92]">
+        {/* Status strip */}
+        {architectureMap && (isProcessing || isDone) && (
+          <div className="border-b border-[#1B1B1E] bg-[#0F0F11]/70 px-6 py-2 backdrop-blur-md">
+            <div className="flex items-center gap-2.5 text-[12px]">
+              {isProcessing ? (
+                <>
+                  <span className="relative flex h-2 w-2 shrink-0">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#D4A359] opacity-60" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-[#D4A359]" />
+                  </span>
+                  <p className="min-w-0 flex-1 truncate text-[#9E9A92]">
                     {analysisPhase === "ai_preparation"
                       ? "AI knowledge preparation is running in the background."
                       : "Repository analysis is running."}
                   </p>
-                  <span className="shrink-0 font-mono text-[11px] text-[#726E67]">
-                    {Math.min(100, Math.max(0, analysisProgress))}%
+                  <span className="shrink-0 font-mono text-[11px] text-[#D4A359]">{progress}%</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-3.5 w-3.5 text-[#D4A359]" />
+                  <span className="font-mono text-[11.5px] text-[#9E9A92]">
+                    AI indexation complete. Semantic code navigation unlocked.
                   </span>
-                </div>
-                <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-[#1F1F22]">
-                  <div
-                    className="h-full rounded-full bg-[#9E9A92] transition-all duration-500"
-                    style={{ width: `${Math.min(100, Math.max(0, analysisProgress))}%` }}
-                  />
-                </div>
-              </div>
+                </>
+              )}
             </div>
           </div>
         )}
 
-        {/* Completion Indicator */}
-        {architectureMap && analysisStatus === "completed" && (
-          <div className="border-b border-[#232326] bg-[#121215]/50 px-6 py-1.5">
-            <div className="mx-auto flex max-w-[1400px] items-center gap-2 text-[11px] font-mono text-[#9E9A92]">
-              <CheckCircle2 className="h-3.5 w-3.5 text-[#EAE7E0]" />
-              <span>AI indexation complete. Semantic code navigation unlocked.</span>
-            </div>
-          </div>
-        )}
-
-        {/* Viewport Container */}
-        <div className={tab === "architecture" || tab === "qa" ? "w-full flex-1 p-3" : "mx-auto flex w-full max-w-[1200px] flex-1 px-6 py-8"}>
+        {/* Viewport */}
+        <div className={tab === "architecture" || tab === "qa" ? "w-full flex-1 p-3" : "mx-auto flex w-full max-w-[1100px] flex-1 px-6 py-12"}>
           {isLoading && (
-            <div className="flex min-h-[40vh] items-center justify-center">
-              <div className="text-center">
-                <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-[#232326] border-t-[#EAE7E0]" />
-                <p className="mt-4 font-mono text-[12px] uppercase tracking-wider text-[#9E9A92]">Mapping repository structure…</p>
+            <div className="cn-rise mx-auto mt-[12vh] w-full max-w-[560px]">
+              <p className="font-display text-[34px] leading-tight text-[#EAE7E0]">Mapping repository structure…</p>
+              <p className="mt-2 text-[13px] text-[#726E67]">Reading files, grouping layers and tracing dependencies.</p>
+              <div className="mt-8 space-y-3">
+                <div className="cn-sheen h-3 w-full rounded-full" />
+                <div className="cn-sheen h-3 w-[86%] rounded-full" />
+                <div className="cn-sheen h-3 w-[64%] rounded-full" />
               </div>
             </div>
           )}
 
           {error && (
-            <p className="border-l-2 border-[#D4A359] pl-3 font-mono text-[13px] text-[#EAE7E0]">
+            <p className="cn-rise h-fit rounded-lg border border-[#D4A359]/30 bg-[#D4A359]/[0.06] px-4 py-3 font-mono text-[13px] text-[#EAE7E0]">
               {error}
             </p>
           )}
 
           {!isLoading && !error && architectureMap && (
             <>
-              {/* Overview Tab */}
+              {/* Overview */}
               {tab === "overview" && (
-                <div className="max-w-[800px] space-y-6">
-                  <div className="flex flex-wrap gap-3">
-                    <StatChip label="Structure" value={architectureMap.type === "structured" ? "Clear" : "Loose"} />
-                    <StatChip label={architectureMap.type === "structured" ? "Layers" : "Ranked files"} value={architectureMap.type === "structured" ? architectureMap.layers.length : architectureMap.rankedFiles.length} />
-                    <StatChip label="Files" value={totalFiles} />
-                  </div>
+                <div className="cn-rise w-full">
+                  <p className="text-[12px] font-medium text-[#D4A359]">Executive summary</p>
+                  <p className="font-display mt-4 max-w-[900px] text-[30px] leading-[1.25] text-[#EAE7E0] md:text-[38px]">
+                    {architectureMap.summary}
+                  </p>
 
-                  <div className="rounded-xl border border-[#232326] bg-[#141417] p-6 shadow-sm">
-                    <h2 className="font-mono text-[11px] uppercase tracking-widest text-[#726E67]">Executive Summary</h2>
-                    <p className="mt-3 text-[14px] leading-7 text-[#C2C0B8]">
-                      {architectureMap.summary}
-                    </p>
-                  </div>
+                  <dl className="mt-12 grid grid-cols-3 divide-x divide-[#232326] border-y border-[#232326]">
+                    {[
+                      { label: "Structure", value: architectureMap.type === "structured" ? "Clear" : "Loose" },
+                      {
+                        label: architectureMap.type === "structured" ? "Layers" : "Ranked files",
+                        value: architectureMap.type === "structured" ? architectureMap.layers.length : architectureMap.rankedFiles.length,
+                      },
+                      { label: "Files", value: totalFiles },
+                    ].map((s) => (
+                      <StatBlock key={s.label} label={s.label} value={s.value} />
+                    ))}
+                  </dl>
+
+                  <h2 className="mt-14 text-[13px] font-medium text-[#9E9A92]">
+                    {architectureMap.type === "structured" ? "How the code is organized" : "Most important files"}
+                  </h2>
 
                   {architectureMap.type === "structured" ? (
-                    <div className="space-y-3">
-                      {architectureMap.layers.map((layer) => (
-                        <div key={layer.name} className="rounded-xl border border-[#232326] bg-[#141417] p-4 transition-all duration-200 hover:border-[#38373B]">
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="text-[14px] font-semibold text-[#EAE7E0]">{layer.name}</span>
-                            <span className="shrink-0 rounded-full border border-[#2B2B30] bg-[#1B1B1E] px-2.5 py-0.5 font-mono text-[10px] text-[#9E9A92]">
-                              {layer.files.length} file{layer.files.length === 1 ? "" : "s"}
+                    <ol className="mt-4 divide-y divide-[#1E1E21]">
+                      {architectureMap.layers.map((layer) => {
+                        const share = totalFiles ? (layer.files.length / totalFiles) * 100 : 0;
+                        return (
+                          <li key={layer.name} className="group grid gap-x-8 gap-y-2 py-5 transition-colors md:grid-cols-[220px_1fr_140px]">
+                            <span className="text-[15px] font-semibold text-[#EAE7E0] transition-colors group-hover:text-[#D4A359]">
+                              {layer.name}
                             </span>
-                          </div>
-                          <p className="mt-2 text-[13px] leading-6 text-[#9E9A92]">{layer.description}</p>
-                        </div>
-                      ))}
-                    </div>
+                            <p className="text-[13.5px] leading-6 text-[#9E9A92]">{layer.description}</p>
+                            <div className="flex flex-col items-start gap-2 md:items-end">
+                              <span className="font-mono text-[11px] text-[#726E67]">
+                                {layer.files.length} file{layer.files.length === 1 ? "" : "s"}
+                              </span>
+                              <div className="h-[3px] w-full max-w-[140px] overflow-hidden rounded-full bg-[#1E1E21]">
+                                <div className="h-full rounded-full bg-[#D4A359]/80" style={{ width: `${Math.max(share, 3)}%` }} />
+                              </div>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ol>
                   ) : (
-                    <div className="space-y-3">
+                    <ol className="mt-4 divide-y divide-[#1E1E21]">
                       {architectureMap.rankedFiles.map((file) => (
-                        <div key={file.path} className="rounded-xl border border-[#232326] bg-[#141417] p-4 transition-all duration-200 hover:border-[#38373B]">
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="truncate font-mono text-[12px] text-[#EAE7E0]">{file.path}</span>
-                            <span className="shrink-0 font-mono text-[11px] text-[#D4A359]">{file.importanceScore.toFixed(2)}</span>
+                        <li key={file.path} className="group grid gap-x-8 gap-y-2 py-5 md:grid-cols-[1fr_140px]">
+                          <div className="min-w-0">
+                            <span className="block truncate font-mono text-[12.5px] text-[#EAE7E0] transition-colors group-hover:text-[#D4A359]">
+                              {file.path}
+                            </span>
+                            <p className="mt-1.5 text-[13.5px] leading-6 text-[#9E9A92]">{file.reason}</p>
                           </div>
-                          <p className="mt-2 text-[13px] leading-6 text-[#9E9A92]">{file.reason}</p>
-                        </div>
+                          <div className="flex flex-col items-start gap-2 md:items-end">
+                            <span className="font-mono text-[12px] text-[#D4A359]">{file.importanceScore.toFixed(2)}</span>
+                            <div className="h-[3px] w-full max-w-[140px] overflow-hidden rounded-full bg-[#1E1E21]">
+                              <div className="h-full rounded-full bg-[#D4A359]/80" style={{ width: `${(file.importanceScore / maxScore) * 100}%` }} />
+                            </div>
+                          </div>
+                        </li>
                       ))}
-                    </div>
+                    </ol>
                   )}
                 </div>
               )}
 
-              {/* Architecture Tab */}
+              {/* Architecture */}
               {tab === "architecture" && (
-                <div className="flex h-[calc(100vh-125px)] w-full gap-3">
-                  <div className="w-[300px] shrink-0 overflow-hidden rounded-xl border border-[#232326] bg-[#141417] p-2.5">
+                <div className="cn-rise flex h-[calc(100vh-125px)] w-full gap-3">
+                  <aside className="w-[300px] shrink-0 overflow-hidden rounded-2xl border border-[#232326] bg-[#111113]/90 p-2.5">
                     {repositoryTree ? (
                       <RepositoryTree tree={repositoryTree} onSelectFile={handleFileSelect} />
                     ) : (
@@ -498,49 +536,16 @@ export default function AnalysisPage() {
                         Tree unavailable.
                       </div>
                     )}
-                  </div>
+                  </aside>
 
                   <div className="flex min-w-0 flex-1">
-                    <div className={`min-w-0 flex-1 overflow-hidden rounded-xl border border-[#232326] bg-[#111113] ${isExplanationOpen ? "rounded-r-none border-r-0" : ""}`}>
-                      {isFileLoading ? (
-                        <div className="flex h-full items-center justify-center">
-                          <p className="font-mono text-[12px] text-[#726E67]">Loading source document...</p>
-                        </div>
-                      ) : selectedFile ? (
-                        <div className="flex h-full flex-col">
-                          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[#232326] bg-[#141417] px-4 py-2.5">
-                            <div className="min-w-0">
-                              <p className="font-mono text-[10px] text-[#726E67]">FILE PATH</p>
-                              <p className="truncate font-mono text-[12px] text-[#EAE7E0]" title={selectedFile.path}>
-                                {selectedFile.path}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={handleExplanationToggle}
-                              className={`flex shrink-0 items-center gap-2 rounded-lg border px-3 py-1.5 font-mono text-[11px] transition-all duration-200 ${
-                                isExplanationOpen
-                                  ? "border-[#38373B] bg-[#222226] text-[#EAE7E0]"
-                                  : "border-[#232326] bg-[#18181B] text-[#9E9A92] hover:border-[#38373B] hover:text-[#EAE7E0]"
-                              }`}
-                            >
-                              {isExplanationOpen ? <PanelRightClose className="h-3.5 w-3.5" /> : <Brain className="h-3.5 w-3.5 text-[#9E9A92]" />}
-                              <span>{isExplanationOpen ? "Hide AI" : "Explain file"}</span>
-                            </button>
-                          </div>
-
-                          <div className="custom-scrollbar flex-1 overflow-auto bg-[#0E0E10]">
-                            <pre className="min-h-full p-4 font-mono text-[12px] leading-6 text-[#C2C0B8]">
-                              <code>{selectedFile.content}</code>
-                            </pre>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex h-full flex-col items-center justify-center p-6 text-center">
-                          <p className="font-mono text-[12px] text-[#726E67]">SELECT A FILE</p>
-                          <p className="mt-1 text-[13px] text-[#9E9A92]">Pick a file from the code tree to preview source & insights.</p>
-                        </div>
-                      )}
+                    <div className={`min-w-0 flex-1 overflow-hidden rounded-2xl border border-[#232326] bg-[#0E0E10] ${isExplanationOpen ? "rounded-r-none border-r-0" : ""}`}>
+                      <SourceViewer
+                        file={selectedFile}
+                        isLoading={isFileLoading}
+                        isExplanationOpen={isExplanationOpen}
+                        onToggleExplanation={handleExplanationToggle}
+                      />
                     </div>
 
                     {isExplanationOpen && (
@@ -548,12 +553,12 @@ export default function AnalysisPage() {
                         <div
                           role="separator"
                           onMouseDown={handleResizeStart}
-                          className="group relative flex w-2.5 shrink-0 cursor-col-resize items-center justify-center border-y border-[#232326] bg-[#141417] hover:bg-[#222226]"
+                          className="group relative flex w-2.5 shrink-0 cursor-col-resize items-center justify-center border-y border-[#232326] bg-[#141417] transition-colors hover:bg-[#D4A359]/20"
                         >
-                          <GripVertical className="h-3.5 w-3.5 text-[#726E67] group-hover:text-[#EAE7E0]" />
+                          <GripVertical className="h-3.5 w-3.5 text-[#726E67] group-hover:text-[#D4A359]" />
                         </div>
 
-                        <div className="shrink-0 overflow-hidden rounded-r-xl border border-[#232326] border-l-0 bg-[#141417]" style={{ width: `${explanationPanelWidth}px` }}>
+                        <div className="shrink-0 overflow-hidden rounded-r-2xl border border-l-0 border-[#232326] bg-[#121214]" style={{ width: `${explanationPanelWidth}px` }}>
                           <ExplanationPanel explanation={fileExplanation} isLoading={isExplanationLoading} error={explanationError} />
                         </div>
                       </>
@@ -562,16 +567,18 @@ export default function AnalysisPage() {
                 </div>
               )}
 
-              {/* Q&A Tab */}
+              {/* Q&A */}
               {tab === "qa" && (
                 capabilities.qa && capabilities.navigation ? (
                   <QAChat repositoryId={jobId ?? ""} repositoryTree={repositoryTree} onSelectFile={handleFileSelect} />
                 ) : (
-                  <div className="flex h-[calc(100vh-140px)] items-center justify-center rounded-xl border border-[#232326] bg-[#141417]">
+                  <div className="cn-rise flex h-[calc(100vh-140px)] w-full items-center justify-center rounded-2xl border border-[#232326] bg-[#111113]/90">
                     <div className="max-w-md p-6 text-center">
-                      <Brain className="mx-auto h-6 w-6 text-[#9E9A92]" />
-                      <p className="mt-3 text-[14px] font-semibold text-[#EAE7E0]">Q&A engine initializing</p>
-                      <p className="mt-1.5 text-[12px] leading-5 text-[#9E9A92]">Semantic graph mappings are currently processing. Check back in a moment.</p>
+                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-[#2B2B30] bg-[#161619]">
+                        <Brain className="h-5 w-5 animate-pulse text-[#D4A359]" />
+                      </div>
+                      <p className="font-display mt-5 text-[28px] text-[#EAE7E0]">Q&A engine initializing</p>
+                      <p className="mt-2 text-[13px] leading-5 text-[#9E9A92]">Semantic graph mappings are currently processing. Check back in a moment.</p>
                     </div>
                   </div>
                 )
@@ -584,11 +591,11 @@ export default function AnalysisPage() {
   );
 }
 
-function StatChip({ label, value }: { label: string; value: string | number }) {
+function StatBlock({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-xl border border-[#232326] bg-[#141417] px-4 py-2.5 backdrop-blur-md">
-      <p className="font-mono text-[9px] uppercase tracking-wider text-[#726E67]">{label}</p>
-      <p className="mt-0.5 text-[14px] font-semibold text-[#EAE7E0]">{value}</p>
+    <div className="px-6 py-6 first:pl-0">
+      <dt className="text-[12px] text-[#726E67]">{label}</dt>
+      <dd className="font-display mt-1 text-[48px] leading-none text-[#EAE7E0]">{value}</dd>
     </div>
   );
 }

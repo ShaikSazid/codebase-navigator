@@ -1,3 +1,52 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2B2B30 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: #2B2B30;
+  border-radius: 999px;
+  border: 3px solid transparent; /* slim, floating pill */
+  background-clip: content-box;
+  transition: background-color 0.2s;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #D4A359;
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Extra-slim variant for panels, trees and chat */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #2B2B30 transparent;
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  border-width: 2px;
+}
+
+html {
+  scroll-behavior: smooth;
+  background: #0D0D0E;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}

@@ -12,20 +12,20 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { ArchitectureLayer } from "../lib/repository.api";
-import { 
-  Folder, 
+import {
+  Folder,
   FolderOpen,
-  FileCode, 
-  ChevronRight, 
-  ChevronDown, 
-  GitFork, 
-  Search, 
-  Maximize2, 
+  FileCode,
+  ChevronRight,
+  ChevronDown,
+  GitFork,
+  Search,
+  Maximize2,
   Minimize2,
-  FileText 
+  FileText,
 } from "lucide-react";
 
-// ---------- Tree Builder (Fixed Leaf Attachment) ----------
+// ---------- Tree Builder ----------
 
 interface TreeNode {
   id: string;
@@ -47,9 +47,9 @@ function buildTree(layers: ArchitectureLayer[], rootLabel: string): TreeNode {
     const childLabel = hasGroup ? layer.name.slice(sep + 3) : null;
 
     if (!groups.has(groupLabel)) {
-      groups.set(groupLabel, { 
-        id: groupLabel, 
-        label: groupLabel, 
+      groups.set(groupLabel, {
+        id: groupLabel,
+        label: groupLabel,
         files: [],
         children: [],
         nodeType: "group",
@@ -59,7 +59,6 @@ function buildTree(layers: ArchitectureLayer[], rootLabel: string): TreeNode {
 
     const group = groups.get(groupLabel)!;
 
-    // Build sub-layer node
     const subNodeId = layer.name;
     const subNode: TreeNode = {
       id: subNodeId,
@@ -70,7 +69,6 @@ function buildTree(layers: ArchitectureLayer[], rootLabel: string): TreeNode {
       nodeType: hasGroup ? "subgroup" : "group",
     };
 
-    // Attach File Children directly to the subNode so they expand as real nodes
     if (layer.description) {
       subNode.children!.push({
         id: `${subNodeId}-desc`,
@@ -121,9 +119,9 @@ function buildTree(layers: ArchitectureLayer[], rootLabel: string): TreeNode {
 
 // ---------- Layout Engine ----------
 
-const NODE_WIDTH = 240;
+const NODE_WIDTH = 250;
 const ROW_HEIGHT = 68;
-const COL_WIDTH = 300;
+const COL_WIDTH = 310;
 
 interface TreeNodeData {
   label: string;
@@ -189,14 +187,14 @@ function layout(
           target: child.id,
           type: "smoothstep",
           animated: depth === 0,
-          style: { stroke: "#3A3A3A", strokeWidth: 1.5 },
+          style: { stroke: depth === 0 ? "#8A6B3A" : "#34343A", strokeWidth: depth === 0 ? 1.75 : 1.25 },
         });
       }
       y = (Math.min(...childYs) + Math.max(...childYs)) / 2;
     }
 
-    const isHighlighted = 
-      searchQuery.length > 0 && 
+    const isHighlighted =
+      searchQuery.length > 0 &&
       node.label.toLowerCase().includes(searchQuery.toLowerCase());
 
     nodes.push({
@@ -224,7 +222,7 @@ function layout(
   return { nodes, edges };
 }
 
-// ---------- Mind Map Node Component ----------
+// ---------- Node Component ----------
 
 interface TreeNodeCardProps {
   id: string;
@@ -234,69 +232,66 @@ interface TreeNodeCardProps {
 function TreeNodeCard({ id, data }: TreeNodeCardProps) {
   const { label, hasChildren, expanded, nodeType, fileCount, isHighlighted, onToggle } = data;
 
-  let cardStyle = "bg-[#1A1A1A] border-[#2A2A2A] text-[#B0B0B0] hover:border-[#3A3A3A]";
+  let cardStyle = "bg-[#141417] border-[#232326] text-[#9E9A92]";
+  let iconStyle = "text-[#726E67]";
   let Icon = Folder;
 
   if (nodeType === "root") {
-    cardStyle = "bg-[#E0E0E0] border-[#E0E0E0] text-[#121212] shadow-lg shadow-black/40 font-semibold";
+    cardStyle = "bg-[#EAE7E0] border-[#EAE7E0] text-[#0D0D0E] font-semibold shadow-[0_0_40px_-6px_rgba(212,163,89,0.45)]";
+    iconStyle = "text-[#0D0D0E]";
     Icon = GitFork;
   } else if (nodeType === "group" || nodeType === "subgroup") {
-    cardStyle = expanded 
-      ? "bg-[#1A1A1A] border-[#555555] text-[#E0E0E0] shadow-md ring-1 ring-[#3A3A3A]" 
-      : "bg-[#161616] border-[#2A2A2A] text-[#B0B0B0] hover:border-[#3A3A3A]";
+    cardStyle = expanded
+      ? "bg-[#18181B] border-[#D4A359]/50 text-[#EAE7E0] shadow-[0_8px_24px_-10px_rgba(0,0,0,0.8)]"
+      : "bg-[#141417] border-[#2B2B30] text-[#C2C0B8] hover:border-[#4A4850]";
+    iconStyle = expanded ? "text-[#D4A359]" : "text-[#9E9A92]";
     Icon = expanded ? FolderOpen : Folder;
   } else if (nodeType === "desc") {
-    cardStyle = "bg-[#121212]/60 border-[#242424] text-[#666666] italic text-[12px]";
+    cardStyle = "border-dashed bg-transparent border-[#26262A] text-[#726E67] italic text-[11.5px]";
     Icon = FileText;
   } else if (nodeType === "file") {
-    cardStyle = "bg-[#121212]/90 border-[#242424] text-[#B0B0B0] text-[12px] hover:border-[#3A3A3A]";
+    cardStyle = "bg-[#0F0F11] border-[#1E1E21] text-[#9E9A92] text-[12px] hover:border-[#3A3940] hover:text-[#EAE7E0]";
     Icon = FileCode;
   } else if (nodeType === "more") {
-    cardStyle = "bg-[#1A1A1A]/60 border-[#2A2A2A] text-[#888888] text-[12px] font-medium";
+    cardStyle = "border-dashed bg-transparent border-[#2B2B30] text-[#726E67] text-[12px]";
     Icon = FileCode;
   }
 
-  const searchHighlight = isHighlighted 
-    ? "ring-2 ring-[#E0E0E0] ring-offset-2 ring-offset-[#121212] scale-105" 
+  const searchHighlight = isHighlighted
+    ? "!border-[#D4A359] ring-2 ring-[#D4A359]/40 ring-offset-2 ring-offset-[#0D0D0E] scale-[1.04]"
     : "";
 
   return (
     <div
       onClick={() => hasChildren && onToggle(id)}
-      className={`group relative flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 transition-all duration-200 border select-none backdrop-blur-md ${hasChildren ? "cursor-pointer" : "cursor-default"} ${cardStyle} ${searchHighlight}`}
+      className={`group relative flex select-none items-center gap-2.5 rounded-xl border px-3.5 py-2.5 transition-all duration-200 ${hasChildren ? "cursor-pointer" : "cursor-default"} ${cardStyle} ${searchHighlight}`}
       style={{ width: NODE_WIDTH }}
     >
-      <Handle type="target" position={Position.Left} className="!opacity-0 !w-1" />
+      <Handle type="target" position={Position.Left} className="!w-1 !opacity-0" />
 
-      <Icon className={`w-4 h-4 shrink-0 ${nodeType === "root" ? "text-[#121212]" : nodeType === "file" ? "text-[#888888]" : "text-[#B0B0B0]"}`} />
+      <Icon className={`h-4 w-4 shrink-0 ${iconStyle}`} />
 
-      <span className="truncate font-medium text-[13px] tracking-tight flex-1">
+      <span className={`flex-1 truncate text-[13px] tracking-tight ${nodeType === "file" ? "font-mono" : "font-medium"}`}>
         {label}
       </span>
 
-      {/* File count indicator */}
       {hasChildren && fileCount > 0 && nodeType !== "root" && (
-        <span className="text-[10px] bg-[#242424] text-[#888888] px-2 py-0.5 rounded-full font-mono">
+        <span className="rounded-full bg-[#1F1F23] px-2 py-0.5 font-mono text-[10px] text-[#9E9A92]">
           {fileCount}
         </span>
       )}
 
-      {/* Toggle Arrow */}
       {hasChildren && (
         <div className={`ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-md transition-colors ${
           nodeType === "root"
-            ? "bg-black/10 group-hover:bg-black/20 text-[#121212]"
-            : "bg-white/5 group-hover:bg-white/10 text-[#B0B0B0]"
+            ? "bg-black/10 text-[#0D0D0E] group-hover:bg-black/20"
+            : "bg-white/5 text-[#9E9A92] group-hover:bg-[#D4A359]/20 group-hover:text-[#D4A359]"
         }`}>
-          {expanded ? (
-            <ChevronDown className="w-3.5 h-3.5" />
-          ) : (
-            <ChevronRight className="w-3.5 h-3.5" />
-          )}
+          {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
         </div>
       )}
 
-      <Handle type="source" position={Position.Right} className="!opacity-0 !w-1" />
+      <Handle type="source" position={Position.Right} className="!w-1 !opacity-0" />
     </div>
   );
 }
@@ -354,35 +349,41 @@ function GraphInner({ layers, repositoryLabel }: ArchitectureGraphProps) {
   }, [tree, expanded, toggle, searchQuery, setNodes, setEdges]);
 
   return (
-    <div className="relative w-full h-full bg-[#121212] overflow-hidden rounded-xl border border-[#2A2A2A]">
-      <div className="absolute top-4 right-4 z-10 flex items-center gap-2 bg-[#1A1A1A]/90 backdrop-blur-md p-1.5 rounded-lg border border-[#2A2A2A] shadow-xl">
+    <div className="relative h-full w-full overflow-hidden rounded-2xl border border-[#232326] bg-[#0D0D0E]">
+      <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_20%_40%,rgba(212,163,89,0.07),transparent_60%)]" />
+
+      <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-xl border border-[#232326] bg-[#111113]/85 p-1.5 shadow-2xl backdrop-blur-xl">
         <div className="relative flex items-center">
-          <Search className="w-3.5 h-3.5 text-[#666666] absolute left-2.5 pointer-events-none" />
+          <Search className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-[#726E67]" />
           <input
             type="text"
             placeholder="Search files or layers..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-48 bg-[#121212] text-[#E0E0E0] text-xs pl-8 pr-3 py-1.5 rounded-md border border-[#2A2A2A] focus:outline-none focus:border-[#555555] transition-colors duration-300"
+            className="w-56 rounded-lg border border-[#232326] bg-[#0D0D0E] py-1.5 pl-8 pr-3 text-xs text-[#EAE7E0] transition-colors duration-300 placeholder:text-[#55534F] focus:border-[#D4A359]/60 focus:outline-none"
           />
         </div>
 
-        <div className="h-4 w-[1px] bg-[#2A2A2A]" />
+        <div className="h-4 w-px bg-[#232326]" />
 
         <button
           onClick={expandAll}
           title="Expand All Nodes"
-          className="p-1.5 text-[#888888] hover:text-[#E0E0E0] hover:bg-[#242424] rounded-md transition-colors duration-300"
+          className="rounded-lg p-1.5 text-[#9E9A92] transition-colors duration-300 hover:bg-[#1F1F23] hover:text-[#D4A359]"
         >
-          <Maximize2 className="w-3.5 h-3.5" />
+          <Maximize2 className="h-3.5 w-3.5" />
         </button>
         <button
           onClick={collapseAll}
           title="Collapse to Root"
-          className="p-1.5 text-[#888888] hover:text-[#E0E0E0] hover:bg-[#242424] rounded-md transition-colors duration-300"
+          className="rounded-lg p-1.5 text-[#9E9A92] transition-colors duration-300 hover:bg-[#1F1F23] hover:text-[#D4A359]"
         >
-          <Minimize2 className="w-3.5 h-3.5" />
+          <Minimize2 className="h-3.5 w-3.5" />
         </button>
+      </div>
+
+      <div className="pointer-events-none absolute bottom-4 right-4 z-10 rounded-lg border border-[#232326] bg-[#111113]/85 px-3 py-1.5 font-mono text-[10.5px] text-[#726E67] backdrop-blur-xl">
+        Click a folder to expand · Scroll to zoom
       </div>
 
       <ReactFlow
@@ -397,10 +398,10 @@ function GraphInner({ layers, repositoryLabel }: ArchitectureGraphProps) {
         minZoom={0.2}
         maxZoom={1.5}
       >
-        <Background variant={BackgroundVariant.Dots} color="#242424" gap={24} size={1} />
+        <Background variant={BackgroundVariant.Dots} color="#26262A" gap={26} size={1.2} />
         <Controls
           showInteractive={false}
-          className="!border-[#2A2A2A] !bg-[#1A1A1A]/90 !backdrop-blur-md !rounded-lg overflow-hidden [&_button]:!border-[#2A2A2A] [&_button]:!bg-transparent [&_button]:!fill-[#B0B0B0] hover:[&_button]:!bg-[#242424]"
+          className="!overflow-hidden !rounded-xl !border !border-[#232326] !bg-[#111113]/90 !shadow-2xl !backdrop-blur-xl [&_button]:!border-[#232326] [&_button]:!bg-transparent [&_button]:!fill-[#9E9A92] hover:[&_button]:!bg-[#1F1F23] hover:[&_button]:!fill-[#D4A359]"
         />
       </ReactFlow>
     </div>
