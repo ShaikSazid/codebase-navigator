@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 
 import { config } from "../../config.js";
@@ -10,6 +11,91 @@ import type { ExplainerInput } from "./explainer.types.js";
 const ai = new GoogleGenAI({
   apiKey: config.geminiApiKey,
 });
+
+type ErrorDetails = {
+  status?: number;
+  code?: string;
+  message: string;
+};
+
+function getErrorDetails(error: unknown): ErrorDetails {
+  if (!(error instanceof Error)) {
+    return {
+      message: String(error),
+    };
+  }
+
+  const err = error as Error & {
+    status?: number;
+    statusCode?: number;
+    code?: string;
+    cause?: {
+      status?: number;
+      statusCode?: number;
+      code?: string;
+      message?: string;
+      cause?: {
+        code?: string;
+        message?: string;
+      };
+    };
+  };
+
+  return {
+    status:
+      err.status ??
+      err.statusCode ??
+      err.cause?.status ??
+      err.cause?.statusCode,
+    code:
+      err.code ??
+      err.cause?.code ??
+      err.cause?.cause?.code,
+    message: err.message,
+  };
+}
+
+function isRetryableError(error: unknown): boolean {
+  const details = getErrorDetails(error);
+
+  const retryableStatuses = new Set([
+    408, 429, 500, 502, 503, 504,
+  ]);
+
+  if (
+    details.status !== undefined &&
+    retryableStatuses.has(details.status)
+  ) {
+    return true;
+  }
+
+  const retryableCodes = new Set([
+    "UND_ERR_HEADERS_TIMEOUT",
+    "UND_ERR_CONNECT_TIMEOUT",
+    "UND_ERR_SOCKET",
+    "ECONNRESET",
+    "ETIMEDOUT",
+    "ECONNREFUSED",
+    "EAI_AGAIN",
+  ]);
+
+  if (
+    details.code !== undefined &&
+    retryableCodes.has(details.code)
+  ) {
+    return true;
+  }
+
+  // Undici can wrap network failures in TypeError.
+  if (
+    error instanceof TypeError &&
+    details.message === "fetch failed"
+  ) {
+    return true;
+  }
+
+  return false;
+}
 
 async function generateExplainerResponse(
   prompt: string,
@@ -33,30 +119,35 @@ async function generateExplainerResponse(
     } catch (error) {
       lastError = error;
 
-      const status =
-        typeof error === "object" &&
-          error !== null &&
-          "status" in error
-          ? error.status
-          : undefined;
+      const details = getErrorDetails(error);
+      const retryable = isRetryableError(error);
 
-      const isRetryable =
-        status === 429 || status === 503;
+      console.error("Explainer Gemini request failed", {
+        attempt,
+        maxAttempts,
+        status: details.status,
+        code: details.code,
+        message: details.message,
+        retryable,
+      });
 
-      if (!isRetryable || attempt === maxAttempts) {
+      if (!retryable || attempt === maxAttempts) {
         throw error;
       }
 
-      const delay =
-        1000 * 2 ** (attempt - 1);
+      // Exponential backoff with jitter.
+      const baseDelay = 1000 * 2 ** (attempt - 1);
+      const jitter = Math.floor(Math.random() * 500);
+      const delay = baseDelay + jitter;
 
       console.warn(
-        `Explainer Gemini request failed with ${status}. Retrying in ${delay}ms...`,
+        `Retrying Explainer Gemini request in ${delay}ms ` +
+          `(attempt ${attempt + 1}/${maxAttempts})`,
       );
 
-      await new Promise((resolve) =>
-        setTimeout(resolve, delay),
-      );
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, delay);
+      });
     }
   }
 
@@ -95,14 +186,15 @@ export async function runExplainerAgent(
   const symbols =
     input.symbols?.length
       ? input.symbols
-        .map(
-          (symbol) =>
-            `- ${symbol.name} (${symbol.kind}) lines ${symbol.startLine}-${symbol.endLine}${symbol.signature
-              ? ` — ${symbol.signature}`
-              : ""
-            }`,
-        )
-        .join("\n")
+          .map(
+            (symbol) =>
+              `- ${symbol.name} (${symbol.kind}) lines ${symbol.startLine}-${symbol.endLine}${
+                symbol.signature
+                  ? ` — ${symbol.signature}`
+                  : ""
+              }`,
+          )
+          .join("\n")
       : "No symbol information provided.";
 
   const prompt = `
@@ -271,9 +363,7 @@ RULES
   }
 
   try {
-    const parsed = JSON.parse(
-      cleanJson(text),
-    );
+    const parsed = JSON.parse(cleanJson(text));
 
     const result =
       FileExplanationSchema.safeParse(parsed);
@@ -284,49 +374,40 @@ RULES
       );
     }
 
-    if (
-      result.data.filePath !==
-      input.filePath
-    ) {
+    if (result.data.filePath !== input.filePath) {
       throw new Error(
         "Explainer agent returned an incorrect file path.",
       );
     }
 
     const enrichedKeyFunctions =
-  result.data.keyFunctions.map(
-    (fn) => {
-      const symbol =
-        findSymbolForFunction(
+      result.data.keyFunctions.map((fn) => {
+        const symbol = findSymbolForFunction(
           fn.name,
           input.symbols ?? [],
         );
 
-      if (!symbol) {
-        return fn;
-      }
+        if (!symbol) {
+          return fn;
+        }
 
-      return {
-        ...fn,
-        kind: symbol.kind,
-        startLine:
-          symbol.startLine,
-        endLine:
-          symbol.endLine,
-        code: extractSymbolCode(
-          input.content,
-          symbol.startLine,
-          symbol.endLine,
-        ),
-      };
-    },
-  );
+        return {
+          ...fn,
+          kind: symbol.kind,
+          startLine: symbol.startLine,
+          endLine: symbol.endLine,
+          code: extractSymbolCode(
+            input.content,
+            symbol.startLine,
+            symbol.endLine,
+          ),
+        };
+      });
 
-return {
-  ...result.data,
-  keyFunctions:
-    enrichedKeyFunctions,
-};
+    return {
+      ...result.data,
+      keyFunctions: enrichedKeyFunctions,
+    };
   } catch (error) {
     if (error instanceof SyntaxError) {
       throw new Error(
@@ -355,9 +436,7 @@ function truncateContent(
     return content;
   }
 
-  const half = Math.floor(
-    maxChars / 2,
-  );
+  const half = Math.floor(maxChars / 2);
 
   return `${content.slice(
     0,
@@ -371,32 +450,23 @@ ${content.slice(-half)}`;
 
 function findSymbolForFunction(
   name: string,
-  symbols: NonNullable<
-    ExplainerInput["symbols"]
-  >,
+  symbols: NonNullable<ExplainerInput["symbols"]>,
 ) {
-  const matches =
-    symbols.filter(
-      (symbol) =>
-        symbol.name === name,
-    );
+  const matches = symbols.filter(
+    (symbol) => symbol.name === name,
+  );
 
   if (matches.length === 0) {
     return undefined;
   }
 
-  /*
-   * Prefer executable symbols.
-   */
+  // Prefer executable symbols.
   return (
     matches.find(
       (symbol) =>
-        symbol.kind ===
-          "function" ||
-        symbol.kind ===
-          "method",
-    ) ??
-    matches[0]
+        symbol.kind === "function" ||
+        symbol.kind === "method",
+    ) ?? matches[0]
   );
 }
 
@@ -406,33 +476,20 @@ function extractSymbolCode(
   endLine: number,
   maxChars = 6000,
 ): string {
-  const lines =
-    content.split(/\r?\n/);
+  const lines = content.split(/\r?\n/);
 
-  const startIndex =
-    Math.max(
-      0,
-      startLine - 1,
-    );
+  const startIndex = Math.max(0, startLine - 1);
 
-  const endIndex =
-    Math.min(
-      lines.length,
-      endLine,
-    );
+  const endIndex = Math.min(
+    lines.length,
+    endLine,
+  );
 
-  const code =
-    lines
-      .slice(
-        startIndex,
-        endIndex,
-      )
-      .join("\n");
+  const code = lines
+    .slice(startIndex, endIndex)
+    .join("\n");
 
-  if (
-    code.length <=
-    maxChars
-  ) {
+  if (code.length <= maxChars) {
     return code;
   }
 
