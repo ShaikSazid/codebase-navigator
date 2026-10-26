@@ -9,6 +9,8 @@ const INGESTION_SERVICE_URL =
   process.env.INGESTION_SERVICE_URL ||
   "http://localhost:5001";
 
+const EXPLAINER_TIMEOUT_MS = 60_000;
+
 export interface ExplainFileInput {
   repositoryId: string;
   filePath: string;
@@ -42,10 +44,6 @@ export async function explainFile(
     "Preparing file explanation request",
   );
 
-  /*
-   * Retrieve structural information produced by
-   * the ingestion/code-intelligence pipeline.
-   */
   let repositoryFileContext:
     | RepositoryFileContextResponse
     | null = null;
@@ -53,16 +51,18 @@ export async function explainFile(
   try {
     const response =
       await axios.get<RepositoryFileContextResponse>(
-        `${INGESTION_SERVICE_URL}/internal/repositories/${encodeURIComponent(input.repositoryId)}/files/context`,
+        `${INGESTION_SERVICE_URL}/internal/repositories/${encodeURIComponent(
+          input.repositoryId,
+        )}/files/context`,
         {
           params: {
             path: input.filePath,
           },
+          timeout: 15_000,
         },
       );
 
-    repositoryFileContext =
-      response.data;
+    repositoryFileContext = response.data;
 
     logger.info(
       {
@@ -78,16 +78,18 @@ export async function explainFile(
       "Repository file context loaded",
     );
   } catch (error) {
-    /*
-     * Explanation should still be possible when
-     * structural context is temporarily unavailable.
-     */
     logger.warn(
       {
         repositoryId: input.repositoryId,
         filePath: input.filePath,
-        error:
-          error instanceof Error
+        error: axios.isAxiosError(error)
+          ? {
+              message: error.message,
+              code: error.code,
+              status: error.response?.status,
+              responseData: error.response?.data,
+            }
+          : error instanceof Error
             ? error.message
             : String(error),
       },
@@ -95,10 +97,6 @@ export async function explainFile(
     );
   }
 
-  /*
-   * Merge structural context with the existing
-   * repository context supplied by the caller.
-   */
   const combinedContext = [
     input.repositoryContext
       ? `ARCHITECTURE CONTEXT\n${input.repositoryContext}`
@@ -109,8 +107,7 @@ export async function explainFile(
           "CODE INTELLIGENCE CONTEXT",
 
           `Language: ${
-            repositoryFileContext.language ??
-            "unknown"
+            repositoryFileContext.language ?? "unknown"
           }`,
 
           "Symbols defined in this file:",
@@ -127,61 +124,99 @@ export async function explainFile(
 
           "Dependencies:",
           repositoryFileContext.dependencies
-            .map(
-              (dependency) =>
-                `- ${dependency}`,
-            )
+            .map((dependency) => `- ${dependency}`)
             .join("\n"),
 
           "Used by:",
           repositoryFileContext.usedBy
-            .map(
-              (file) =>
-                `- ${file}`,
-            )
+            .map((file) => `- ${file}`)
             .join("\n"),
-        ].join("\n"):
-
-      "",
+        ].join("\n")
+      : "",
   ]
     .filter(Boolean)
     .join("\n\n");
 
   const orchestratorInput = {
-  filePath: input.filePath,
-  content: input.content,
+    filePath: input.filePath,
+    content: input.content,
 
-  dependencies:
-    repositoryFileContext?.dependencies ??
-    input.dependencies ??
-    [],
+    dependencies:
+      repositoryFileContext?.dependencies ??
+      input.dependencies ??
+      [],
 
-  repositoryContext:
-    combinedContext ||
-    "No additional repository context provided.",
+    repositoryContext:
+      combinedContext ||
+      "No additional repository context provided.",
 
-  language:
-    repositoryFileContext?.language,
+    language: repositoryFileContext?.language,
 
-  usedBy:
-    repositoryFileContext?.usedBy ?? [],
+    usedBy: repositoryFileContext?.usedBy ?? [],
 
-  symbols:
-    repositoryFileContext?.symbols ?? [],
-};
+    symbols: repositoryFileContext?.symbols ?? [],
+  };
 
   logger.info(
     {
       repositoryId: input.repositoryId,
       filePath: input.filePath,
+      orchestratorUrl: AGENT_ORCHESTRATOR_URL,
+      contentLength: input.content.length,
     },
     "Sending enriched file explanation request to agent orchestrator",
   );
 
-  const response = await axios.post(
-    `${AGENT_ORCHESTRATOR_URL}/internal/explain`,
-    orchestratorInput,
-  );
+  try {
+    const response = await axios.post(
+      `${AGENT_ORCHESTRATOR_URL}/internal/explain`,
+      orchestratorInput,
+      {
+        timeout: EXPLAINER_TIMEOUT_MS,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
 
-  return response.data;
+    logger.info(
+      {
+        repositoryId: input.repositoryId,
+        filePath: input.filePath,
+        status: response.status,
+      },
+      "File explanation generated successfully",
+    );
+
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      logger.error(
+        {
+          repositoryId: input.repositoryId,
+          filePath: input.filePath,
+          orchestratorUrl: AGENT_ORCHESTRATOR_URL,
+          status: error.response?.status,
+          responseData: error.response?.data,
+          errorCode: error.code,
+          message: error.message,
+        },
+        "Agent orchestrator file explanation failed",
+      );
+    } else {
+      logger.error(
+        {
+          repositoryId: input.repositoryId,
+          filePath: input.filePath,
+          error:
+            error instanceof Error
+              ? error.message
+              : String(error),
+        },
+        "Unexpected file explanation failure",
+      );
+    }
+
+    throw error;
+  }
 }
