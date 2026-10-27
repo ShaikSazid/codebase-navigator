@@ -229,17 +229,18 @@ function highlight(source: string, spec: LangSpec | null): Token[][] {
   return lines;
 }
 
+/* Syntax colors tuned for the indigo (#22223B) code window */
 const TOKEN_CLASS: Record<TokenKind, string> = {
-  kw: "text-[#E8C48A]",
-  str: "text-[#A3B88C]",
-  num: "text-[#E0A87A]",
-  com: "italic text-[#5F5C56]",
-  fn: "text-[#9DB7D5]",
-  type: "text-[#C4A3C7]",
-  const: "text-[#E0A87A]",
-  prop: "text-[#9DB7D5]",
-  punct: "text-[#8A8780]",
-  plain: "text-[#C2C0B8]",
+  kw: "text-[#F2B8A0]",
+  str: "text-[#A9D6B8]",
+  num: "text-[#F0C27A]",
+  com: "italic text-[#8588A6]",
+  fn: "text-[#A7C3F2]",
+  type: "text-[#D6B6EA]",
+  const: "text-[#F0C27A]",
+  prop: "text-[#A7C3F2]",
+  punct: "text-[#9A9DB8]",
+  plain: "text-[#F2E9E4]",
 };
 
 function formatBytes(bytes: number): string {
@@ -297,15 +298,15 @@ export default function SourceViewer({
   /* Loading */
   if (isLoading) {
     return (
-      <div className="flex h-full flex-col">
-        <div className="flex shrink-0 items-center gap-3 border-b border-[#1E1E21] bg-[#111113]/80 px-4 py-3.5">
-          <div className="cn-sheen h-3 w-48 rounded-full" />
+      <div className="cn-dark flex h-full flex-col">
+        <div className="flex shrink-0 items-center gap-3 border-b border-[#4A4E69]/60 px-4 py-3.5">
+          <div className="cn-sheen-dark h-3 w-48 rounded-full" />
         </div>
         <div className="space-y-3 p-6">
           {SKELETON_WIDTHS.map((width, index) => (
             <div key={index} className="flex items-center gap-5">
-              <div className="cn-sheen h-2.5 w-5 rounded-full" />
-              <div className="cn-sheen h-2.5 rounded-full" style={{ width: `${width}%` }} />
+              <div className="cn-sheen-dark h-2.5 w-5 rounded-full" />
+              <div className="cn-sheen-dark h-2.5 rounded-full" style={{ width: `${width}%` }} />
             </div>
           ))}
         </div>
@@ -316,13 +317,13 @@ export default function SourceViewer({
   /* Empty */
   if (!file || !language) {
     return (
-      <div className="flex h-full flex-col items-center justify-center p-6 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-[#232326] bg-[#141417]">
-          <FileCode2 className="h-5 w-5 text-[#726E67]" />
+      <div className="cn-dark flex h-full flex-col items-center justify-center p-6 text-center">
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-[#4A4E69] bg-[#2C2C47]">
+          <FileCode2 className="h-5 w-5 text-[#F2E9E4]/70" />
         </div>
-        <p className="font-display mt-5 text-[28px] leading-none text-[#EAE7E0]">Select a file</p>
-        <p className="mt-2 max-w-[280px] text-[13px] leading-5 text-[#9E9A92]">
-          Pick a file from the explorer to read its source and get AI insights.
+        <p className="font-display mt-5 text-[26px] leading-none text-[#F2E9E4]">Pick a file to read</p>
+        <p className="mt-2 max-w-[280px] text-[13.5px] leading-5 text-[#F2E9E4]/65">
+          Choose a file in the list to see its source. Then use Explain file for a plain-English summary.
         </p>
       </div>
     );
@@ -332,9 +333,9 @@ export default function SourceViewer({
   const gutterWidth = `${Math.max(String(lines.length).length, 2) + 3}ch`;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="cn-dark flex h-full flex-col">
       {/* Header */}
-      <div className="flex shrink-0 items-center justify-between gap-4 border-b border-[#1E1E21] bg-[#111113]/80 px-4 py-2.5 backdrop-blur">
+      <div className="flex shrink-0 items-center justify-between gap-4 border-b border-[#4A4E69]/60 px-4 py-2.5">
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-1 font-mono text-[12px]" title={file.path}>
             {segments.map((segment, index) => (
@@ -342,21 +343,19 @@ export default function SourceViewer({
                 <span
                   className={
                     index === segments.length - 1
-                      ? "truncate font-medium text-[#EAE7E0]"
-                      : "shrink-0 text-[#726E67]"
+                      ? "truncate font-medium text-[#F2E9E4]"
+                      : "shrink-0 text-[#F2E9E4]/55"
                   }
                 >
                   {segment}
                 </span>
-                {index < segments.length - 1 && <ChevronRight className="h-3 w-3 shrink-0 text-[#454340]" />}
+                {index < segments.length - 1 && <ChevronRight className="h-3 w-3 shrink-0 text-[#F2E9E4]/30" />}
               </span>
             ))}
           </div>
-          <div className="mt-1 flex items-center gap-2 font-mono text-[10.5px] text-[#55534F]">
-            <span className="text-[#9E9A92]">{language.label}</span>
-            <span>·</span>
+          <div className="mt-1 flex items-center gap-3 font-mono text-[10.5px] text-[#F2E9E4]/55">
+            <span className="text-[#F2E9E4]/80">{language.label}</span>
             <span>{lines.length} lines</span>
-            <span>·</span>
             <span>{sizeLabel}</span>
           </div>
         </div>
@@ -366,29 +365,29 @@ export default function SourceViewer({
             type="button"
             onClick={handleCopy}
             title="Copy source"
-            className="flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[12px] text-[#9E9A92] transition-colors hover:bg-[#1B1B1E] hover:text-[#EAE7E0]"
+            className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[12px] text-[#F2E9E4]/75 transition-colors hover:bg-white/10 hover:text-[#F2E9E4]"
           >
-            {copied ? <Check className="h-3.5 w-3.5 text-[#D4A359]" /> : <Copy className="h-3.5 w-3.5" />}
+            {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
             <span>{copied ? "Copied" : "Copy"}</span>
           </button>
 
           <button
             type="button"
             onClick={onToggleExplanation}
-            className={`flex h-8 items-center gap-2 rounded-lg border px-3.5 text-[12px] font-medium transition-all duration-200 ${
+            className={`flex h-8 items-center gap-2 rounded-full border px-4 text-[12.5px] font-medium transition-colors duration-200 ${
               isExplanationOpen
-                ? "border-[#38373B] bg-[#222226] text-[#EAE7E0]"
-                : "border-[#D4A359]/40 bg-[#D4A359]/10 text-[#E8C48A] hover:bg-[#D4A359]/20"
+                ? "border-[#4A4E69] bg-[#4A4E69]/40 text-[#F2E9E4] hover:bg-[#4A4E69]/60"
+                : "border-[#F2E9E4] bg-[#F2E9E4] text-[#22223B] hover:bg-white"
             }`}
           >
             {isExplanationOpen ? <PanelRightClose className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
-            <span>{isExplanationOpen ? "Hide AI" : "Explain file"}</span>
+            <span>{isExplanationOpen ? "Hide explanation" : "Explain file"}</span>
           </button>
         </div>
       </div>
 
       {/* Code */}
-      <div className="custom-scrollbar min-h-0 flex-1 overflow-auto bg-[#0E0E10]">
+      <div className="custom-scrollbar min-h-0 flex-1 overflow-auto bg-[#22223B]">
         <div className="min-w-max py-3 font-mono text-[12.5px] leading-[22px]" style={{ tabSize: 2 }}>
           {lines.map((tokens, index) => {
             const lineNumber = index + 1;
@@ -399,13 +398,13 @@ export default function SourceViewer({
                 onClick={() => setSelectedLine(isSelected ? null : lineNumber)}
                 className={`group flex cursor-text border-l-2 transition-colors ${
                   isSelected
-                    ? "border-[#D4A359] bg-[#D4A359]/[0.08]"
-                    : "border-transparent hover:bg-white/[0.025]"
+                    ? "border-[#F2E9E4] bg-white/[0.08]"
+                    : "border-transparent hover:bg-white/[0.04]"
                 }`}
               >
                 <span
-                  className={`sticky left-0 z-10 shrink-0 select-none bg-[#0E0E10] pr-4 text-right transition-colors ${
-                    isSelected ? "text-[#D4A359]" : "text-[#4A4845] group-hover:text-[#726E67]"
+                  className={`sticky left-0 z-10 shrink-0 select-none bg-[#22223B] pr-4 text-right transition-colors ${
+                    isSelected ? "text-[#F2E9E4]" : "text-[#7A7D9C] group-hover:text-[#F2E9E4]/80"
                   }`}
                   style={{ width: gutterWidth }}
                 >
