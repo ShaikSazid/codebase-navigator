@@ -20,7 +20,7 @@ import ExplanationPanel from "../components/ExplanationPanel";
 import QAChat from "../components/QAChat";
 import SourceViewer from "../components/Sourceviewer";
 
-import { Brain, GripVertical, Terminal, ChevronRight, Lock } from "lucide-react";
+import { Brain, GripVertical, Terminal, Lock } from "lucide-react";
 
 /* Palette (shared with the landing page):
    #F2E9E4 cream (page), #22223B indigo (ink, code window, primary buttons), #4A4E69 slate (lines, muted text). */
