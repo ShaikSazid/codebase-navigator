@@ -118,28 +118,30 @@ export default function RepositoryTree({ tree, onSelectFile }: RepositoryTreePro
   const totalFiles = fileCounts.get(displayTree.path) ?? 0;
 
   return (
-    <div className="flex h-full w-full flex-col bg-transparent text-[#EAE7E0]">
+    <div className="flex h-full w-full flex-col bg-transparent text-[#22223B]">
       {/* Header */}
       <div className="mb-3 flex shrink-0 items-center justify-between px-1.5 pt-1">
         <div className="flex items-baseline gap-2">
-          <span className="text-[12px] font-semibold tracking-tight text-[#EAE7E0]">Explorer</span>
-          <span className="font-mono text-[10.5px] text-[#55534F]">{totalFiles} files</span>
+          <span className="font-display text-[14px]">Files</span>
+          <span className="font-mono text-[10.5px] text-[#5F6380]">{totalFiles}</span>
         </div>
 
         <div className="flex items-center gap-0.5">
           <button
             type="button"
             onClick={expandAll}
-            title="Expand all"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-[#726E67] transition-colors hover:bg-[#1B1B1E] hover:text-[#D4A359]"
+            title="Expand all folders"
+            aria-label="Expand all folders"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-[#4A4E69] transition-colors hover:bg-[#22223B]/[0.08] hover:text-[#22223B]"
           >
             <UnfoldVertical className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
             onClick={collapseAll}
-            title="Collapse all"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-[#726E67] transition-colors hover:bg-[#1B1B1E] hover:text-[#D4A359]"
+            title="Collapse all folders"
+            aria-label="Collapse all folders"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-[#4A4E69] transition-colors hover:bg-[#22223B]/[0.08] hover:text-[#22223B]"
           >
             <FoldVertical className="h-3.5 w-3.5" />
           </button>
@@ -148,21 +150,22 @@ export default function RepositoryTree({ tree, onSelectFile }: RepositoryTreePro
 
       {/* Search */}
       <div className="mb-2.5 shrink-0">
-        <div className="flex items-center gap-2 rounded-lg border border-[#232326] bg-[#0E0E10] px-2.5 py-1.5 transition-all duration-200 focus-within:border-[#D4A359]/50 focus-within:shadow-[0_0_0_3px_rgba(212,163,89,0.08)]">
-          <Search className="h-3.5 w-3.5 shrink-0 text-[#726E67]" />
+        <div className="flex items-center gap-2 rounded-full border border-[#4A4E69]/35 bg-white/60 px-3 py-1.5 transition-colors focus-within:border-[#22223B]">
+          <Search className="h-3.5 w-3.5 shrink-0 text-[#4A4E69]" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search files..."
-            className="w-full min-w-0 bg-transparent text-[12.5px] text-[#EAE7E0] outline-none placeholder:text-[#55534F]"
+            placeholder="Search files"
+            aria-label="Search files"
+            className="w-full min-w-0 bg-transparent text-[13px] text-[#22223B] outline-none placeholder:text-[#6B6F88]"
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => setSearchQuery("")}
               aria-label="Clear search"
-              className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-[#726E67] hover:text-[#EAE7E0]"
+              className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-[#4A4E69] hover:text-[#22223B]"
             >
               <X className="h-3 w-3" />
             </button>
@@ -185,22 +188,22 @@ export default function RepositoryTree({ tree, onSelectFile }: RepositoryTreePro
           />
         ) : (
           <div className="flex flex-col items-center px-2 py-12 text-center">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#232326] bg-[#141417]">
-              <FileSearch className="h-4 w-4 text-[#726E67]" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#4A4E69]/30 bg-white/60">
+              <FileSearch className="h-4 w-4 text-[#4A4E69]" />
             </div>
-            <p className="mt-3 text-[12.5px] text-[#9E9A92]">No matches</p>
-            <p className="mt-0.5 text-[11.5px] text-[#55534F]">Nothing found for &quot;{searchQuery}&quot;</p>
+            <p className="mt-3 text-[13px] font-medium">No matching files</p>
+            <p className="mt-0.5 text-[12px] text-[#5F6380]">Nothing found for &quot;{searchQuery}&quot;</p>
           </div>
         )}
       </div>
 
       {/* Path bar */}
-      <div className="mt-2.5 shrink-0 border-t border-[#1E1E21] pt-2.5">
+      <div className="mt-2.5 shrink-0 border-t border-[#4A4E69]/20 pt-2.5">
         <div className="custom-scrollbar flex items-center gap-1 overflow-x-auto whitespace-nowrap px-1.5 pb-1 font-mono text-[11px]">
           {pathSegments.map((segment, index) => (
             <span key={index} className="flex shrink-0 items-center gap-1">
-              {index > 0 && <ChevronRight className="h-2.5 w-2.5 text-[#38373B]" />}
-              <span className={index === pathSegments.length - 1 ? "text-[#E8C48A]" : "text-[#726E67]"}>
+              {index > 0 && <ChevronRight className="h-2.5 w-2.5 text-[#6B6F88]" />}
+              <span className={index === pathSegments.length - 1 ? "font-medium text-[#22223B]" : "text-[#5F6380]"}>
                 {segment}
               </span>
             </span>
@@ -218,7 +221,7 @@ function Highlight({ text, query }: { text: string; query: string }) {
   return (
     <>
       {text.slice(0, index)}
-      <mark className="rounded-sm bg-[#D4A359]/25 px-px text-[#E8C48A]">
+      <mark className="rounded-sm bg-[#22223B]/15 px-px text-[#22223B]">
         {text.slice(index, index + query.length)}
       </mark>
       {text.slice(index + query.length)}
@@ -275,13 +278,15 @@ function RepositoryTreeNodeView({
         type="button"
         onClick={() => onNodeClick(node)}
         onKeyDown={handleKeyDown}
-        className={`group relative flex w-full items-center gap-1.5 rounded-lg py-[6px] pr-2 text-left outline-none transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-[#D4A359]/50 ${
-          isSelected ? "bg-[#D4A359]/[0.10]" : "hover:bg-[#161618]"
+        aria-expanded={isFolder ? isExpanded : undefined}
+        aria-current={isSelected ? "true" : undefined}
+        className={`group relative flex w-full items-center gap-1.5 rounded-lg py-[6px] pr-2 text-left outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-[#22223B]/60 ${
+          isSelected ? "bg-[#22223B]/[0.10]" : "hover:bg-[#22223B]/[0.05]"
         }`}
         style={{ paddingLeft: `${depth * INDENT + 6}px` }}
       >
         {isSelected && (
-          <span className="absolute left-0 top-1/2 h-4 w-[2px] -translate-y-1/2 rounded-r bg-[#D4A359]" />
+          <span className="absolute left-0 top-1/2 h-4 w-[2px] -translate-y-1/2 rounded-r bg-[#22223B]" />
         )}
 
         <span
@@ -289,15 +294,15 @@ function RepositoryTreeNodeView({
             isFolder ? (isExpanded ? "rotate-90" : "rotate-0") : "opacity-0"
           }`}
         >
-          <ChevronRight className="h-3 w-3 text-[#55534F] group-hover:text-[#9E9A92]" />
+          <ChevronRight className="h-3 w-3 text-[#5F6380] group-hover:text-[#22223B]" />
         </span>
 
         <span className="flex h-4 w-4 shrink-0 items-center justify-center">
           {isFolder ? (
             isExpanded ? (
-              <FolderOpen className="h-3.5 w-3.5 text-[#D4A359]" />
+              <FolderOpen className="h-3.5 w-3.5 text-[#22223B]" />
             ) : (
-              <Folder className="h-3.5 w-3.5 text-[#8A8780] group-hover:text-[#C2C0B8]" />
+              <Folder className="h-3.5 w-3.5 text-[#4A4E69] group-hover:text-[#22223B]" />
             )
           ) : (
             getFileIcon(node.name, isSelected)
@@ -307,17 +312,15 @@ function RepositoryTreeNodeView({
         <span
           className={`min-w-0 flex-1 truncate ${
             isFolder
-              ? `text-[12.5px] font-medium ${isSelected ? "text-[#EAE7E0]" : "text-[#C2C0B8]"}`
-              : `font-mono text-[12px] ${
-                  isSelected ? "text-[#EAE7E0]" : "text-[#9E9A92] group-hover:text-[#EAE7E0]"
-                }`
+              ? `text-[13px] font-medium ${isSelected ? "text-[#22223B]" : "text-[#2E2F4A]"}`
+              : `font-mono text-[12px] ${isSelected ? "font-medium text-[#22223B]" : "text-[#4A4E69] group-hover:text-[#22223B]"}`
           }`}
         >
           <Highlight text={node.name} query={query} />
         </span>
 
         {isFolder && !isExpanded && count > 0 && (
-          <span className="font-mono text-[10px] text-[#55534F] group-hover:text-[#726E67]">{count}</span>
+          <span className="font-mono text-[10px] text-[#5F6380]">{count}</span>
         )}
       </button>
 
@@ -325,7 +328,7 @@ function RepositoryTreeNodeView({
         <div className="relative">
           <span
             aria-hidden="true"
-            className="absolute bottom-1 top-0 w-px bg-[#1E1E21] transition-colors group-hover:bg-[#2B2B30]"
+            className="absolute bottom-1 top-0 w-px bg-[#4A4E69]/20"
             style={{ left: `${depth * INDENT + 6 + 7}px` }}
           />
           {children.length > 0 ? (
@@ -344,10 +347,10 @@ function RepositoryTreeNodeView({
             ))
           ) : (
             <div
-              className="py-1 text-[11px] italic text-[#55534F]"
+              className="py-1 text-[11.5px] italic text-[#5F6380]"
               style={{ paddingLeft: `${(depth + 1) * INDENT + 6}px` }}
             >
-              empty directory
+              empty folder
             </div>
           )}
         </div>
@@ -360,29 +363,29 @@ function getFileIcon(fileName: string, isSelected: boolean) {
   const ext = fileName.split(".").pop()?.toLowerCase();
   const base = "h-3.5 w-3.5 shrink-0";
 
-  // Subtle, warm-toned tints per file kind; selected rows use the gold accent
-  const tint = (color: string) => (isSelected ? "text-[#D4A359]" : color);
+  // Muted tints per file kind on cream; the selected row uses the ink color
+  const tint = (color: string) => (isSelected ? "text-[#22223B]" : color);
 
   switch (ext) {
     case "ts":
     case "tsx":
     case "js":
     case "jsx":
-      return <FileCode className={`${base} ${tint("text-[#B8976A]")}`} />;
+      return <FileCode className={`${base} ${tint("text-[#4A4E69]")}`} />;
     case "json":
-      return <FileJson className={`${base} ${tint("text-[#A3AE86]")}`} />;
+      return <FileJson className={`${base} ${tint("text-[#5E7A4F]")}`} />;
     case "md":
     case "txt":
-      return <FileText className={`${base} ${tint("text-[#8FA0AD]")}`} />;
+      return <FileText className={`${base} ${tint("text-[#4F7389]")}`} />;
     case "css":
     case "scss":
     case "html":
     case "py":
-      return <FileCode className={`${base} ${tint("text-[#B58F9F]")}`} />;
+      return <FileCode className={`${base} ${tint("text-[#8A4F6B]")}`} />;
     case "sql":
     case "csv":
-      return <FileSpreadsheet className={`${base} ${tint("text-[#8FAE9E]")}`} />;
+      return <FileSpreadsheet className={`${base} ${tint("text-[#4F8A72]")}`} />;
     default:
-      return <File className={`${base} ${tint("text-[#726E67]")}`} />;
+      return <File className={`${base} ${tint("text-[#6B6F88]")}`} />;
   }
 }

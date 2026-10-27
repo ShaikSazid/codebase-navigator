@@ -142,23 +142,27 @@ export default function QAChat({ repositoryId }: QAChatProps) {
   }
 
   return (
-    <section className="relative flex h-[calc(100vh-125px)] w-full min-w-0 flex-col overflow-hidden rounded-2xl border border-[#232326] bg-[#0E0E10]">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[radial-gradient(ellipse_at_50%_-30%,rgba(212,163,89,0.09),transparent_70%)]" />
-
+    <section className="relative flex h-[calc(100vh-125px)] w-full min-w-0 flex-col overflow-hidden rounded-2xl border border-[#4A4E69]/25 bg-[#FBF6F3]">
       {/* Header */}
-      <div className="relative flex shrink-0 items-center justify-between border-b border-[#1E1E21] px-5 py-3">
+      <div className="relative flex shrink-0 items-center justify-between border-b border-[#4A4E69]/20 px-5 py-3">
         <div className="flex items-center gap-2.5">
-          <Sparkles className="h-4 w-4 text-[#D4A359]" />
-          <p className="text-[13.5px] font-semibold tracking-tight text-[#EAE7E0]">Ask the codebase</p>
+          <Sparkles className="h-4 w-4" />
+          <h2 className="font-display text-[15px]">Ask about this repository</h2>
         </div>
-        <div className="flex items-center gap-2 font-mono text-[11px] text-[#726E67]">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#D4A359] shadow-[0_0_8px_1px_rgba(212,163,89,0.6)]" />
-          Semantic navigation ready
+        <div className="flex items-center gap-2 text-[12px] text-[#4A4E69]">
+          <span className="h-1.5 w-1.5 rounded-full bg-[#22223B]" />
+          Ready
         </div>
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} onScroll={handleScroll} className="custom-scrollbar relative min-h-0 flex-1 overflow-y-auto">
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="custom-scrollbar relative min-h-0 flex-1 overflow-y-auto"
+        role="log"
+        aria-live="polite"
+      >
         {messages.length === 0 ? (
           <EmptyState
             onAsk={(val) => {
@@ -181,25 +185,27 @@ export default function QAChat({ repositoryId }: QAChatProps) {
         <button
           type="button"
           onClick={scrollToBottom}
-          className="absolute bottom-28 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-[#2B2B30] bg-[#18181B]/95 px-3.5 py-1.5 text-[12px] text-[#EAE7E0] shadow-xl backdrop-blur-md transition-colors hover:border-[#D4A359]/50"
+          className="absolute bottom-28 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[#22223B] px-3.5 py-1.5 text-[12.5px] text-[#F2E9E4] shadow-lg transition-colors hover:bg-[#4A4E69]"
         >
           <ArrowDown className="h-3 w-3" /> Jump to latest
         </button>
       )}
 
       {error && (
-        <div className="relative mx-auto mb-2 flex w-full max-w-[760px] items-center gap-2 rounded-lg border border-[#D4A359]/30 bg-[#D4A359]/[0.07] px-3 py-2 text-[12px] text-[#EAE7E0]">
-          <CircleAlert className="h-3.5 w-3.5 shrink-0 text-[#D4A359]" />
+        <div role="alert" className="relative mx-auto mb-2 flex w-full max-w-[760px] items-center gap-2 rounded-lg border border-[#22223B]/30 bg-[#22223B]/[0.05] px-3 py-2 text-[12.5px]">
+          <CircleAlert className="h-3.5 w-3.5 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {/* Composer */}
       <form onSubmit={handleSubmit} className="relative shrink-0 px-4 pb-4 pt-1">
-        <div className="pointer-events-none absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-[#0E0E10] to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-[#FBF6F3] to-transparent" />
 
-        <div className="mx-auto flex max-w-[760px] items-end gap-2 rounded-2xl border border-[#2B2B30] bg-[#141417] p-2 shadow-[0_10px_40px_-12px_rgba(0,0,0,0.9)] transition-all focus-within:border-[#D4A359]/50 focus-within:shadow-[0_0_0_4px_rgba(212,163,89,0.08),0_10px_40px_-12px_rgba(0,0,0,0.9)]">
+        <div className="mx-auto flex max-w-[760px] items-end gap-2 rounded-[1.6rem] border border-[#4A4E69]/40 bg-white/70 p-2 transition-colors focus-within:border-[#22223B]">
+          <label htmlFor="qa-question" className="sr-only">Your question</label>
           <textarea
+            id="qa-question"
             ref={textareaRef}
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
@@ -211,19 +217,19 @@ export default function QAChat({ repositoryId }: QAChatProps) {
             }}
             disabled={isLoading}
             rows={1}
-            placeholder="Ask anything about this repository..."
-            className="custom-scrollbar max-h-32 min-h-[44px] flex-1 resize-none bg-transparent px-3 py-3 text-[14px] leading-5 text-[#EAE7E0] outline-none placeholder:text-[#55534F] disabled:opacity-60"
+            placeholder="Ask anything about this repository"
+            className="custom-scrollbar max-h-32 min-h-[44px] flex-1 resize-none bg-transparent px-3 py-3 text-[14.5px] leading-5 text-[#22223B] outline-none placeholder:text-[#6B6F88] disabled:opacity-60"
           />
           <button
             type="submit"
             disabled={isLoading || !question.trim()}
             aria-label="Send question"
-            className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-[#EAE7E0] text-[#0D0D0E] transition-all hover:bg-[#FAF8F5] active:scale-95 disabled:cursor-not-allowed disabled:opacity-20"
+            className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#22223B] text-[#F2E9E4] transition-colors hover:bg-[#4A4E69] active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
           >
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </button>
         </div>
-        <p className="mt-2 text-center text-[11px] text-[#55534F]">Enter to send · Shift + Enter for a new line</p>
+        <p className="mt-2 text-center text-[11.5px] text-[#5F6380]">Enter to send, Shift+Enter for a new line</p>
       </form>
     </section>
   );
@@ -243,12 +249,12 @@ function EmptyState({ onAsk }: { onAsk: (q: string) => void }) {
 
   return (
     <div className="cn-rise flex h-full min-h-[420px] flex-col items-center justify-center px-6 py-10 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#D4A359]/30 bg-[#D4A359]/10 shadow-[0_0_50px_-8px_rgba(212,163,89,0.55)]">
-        <Sparkles className="h-5 w-5 text-[#D4A359]" />
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#22223B]">
+        <Sparkles className="h-5 w-5 text-[#F2E9E4]" />
       </div>
-      <h2 className="font-display mt-6 text-[44px] leading-none text-[#EAE7E0]">Ask about this codebase</h2>
-      <p className="mt-3 max-w-sm text-[13.5px] leading-6 text-[#9E9A92]">
-        Trace execution paths, find where things live, and understand how the pieces connect.
+      <h2 className="font-display mt-6 text-[34px] leading-[1.05]">Ask about this codebase</h2>
+      <p className="mt-3 max-w-sm text-[14px] leading-6 text-[#4A4E69]">
+        Find where things live, trace how a request flows, and see which files are involved.
       </p>
 
       <div className="mt-9 grid w-full max-w-[640px] gap-2.5 sm:grid-cols-2">
@@ -257,10 +263,10 @@ function EmptyState({ onAsk }: { onAsk: (q: string) => void }) {
             key={example}
             type="button"
             onClick={() => onAsk(example)}
-            className="group flex items-center justify-between gap-3 rounded-xl border border-[#232326] bg-[#121214] px-4 py-3.5 text-left text-[13px] text-[#9E9A92] transition-all hover:-translate-y-px hover:border-[#D4A359]/40 hover:bg-[#161619] hover:text-[#EAE7E0]"
+            className="group flex items-center justify-between gap-3 rounded-xl border border-[#4A4E69]/30 bg-white/60 px-4 py-3.5 text-left text-[13.5px] text-[#2E2F4A] transition-colors hover:border-[#22223B] hover:bg-white"
           >
             <span>{example}</span>
-            <ArrowUp className="h-3.5 w-3.5 shrink-0 rotate-45 text-[#454340] transition-colors group-hover:text-[#D4A359]" />
+            <ArrowUp className="h-3.5 w-3.5 shrink-0 rotate-45 text-[#5F6380] transition-colors group-hover:text-[#22223B]" />
           </button>
         ))}
       </div>
@@ -271,19 +277,19 @@ function EmptyState({ onAsk }: { onAsk: (q: string) => void }) {
 function Thinking() {
   return (
     <div className="cn-rise flex items-start gap-3.5">
-      <AssistantAvatar active />
+      <AssistantAvatar />
       <div className="min-w-0 flex-1 pt-1">
-        <div className="flex items-center gap-2.5 text-[13px] text-[#9E9A92]">
-          <span className="flex gap-1">
+        <div className="flex items-center gap-2.5 text-[13.5px] text-[#4A4E69]">
+          <span className="flex gap-1" aria-hidden="true">
             {[0, 150, 300].map((d) => (
               <span
                 key={d}
-                className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#D4A359]"
+                className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#22223B]"
                 style={{ animationDelay: `${d}ms` }}
               />
             ))}
           </span>
-          <span>Searching code graph...</span>
+          <span>Searching the code…</span>
         </div>
         <div className="mt-4 space-y-2.5">
           <div className="cn-sheen h-3 w-full rounded-full" />
@@ -295,14 +301,10 @@ function Thinking() {
   );
 }
 
-function AssistantAvatar({ active = false }: { active?: boolean }) {
+function AssistantAvatar() {
   return (
-    <div
-      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${
-        active ? "border-[#D4A359]/30 bg-[#D4A359]/10" : "border-[#2B2B30] bg-[#141417]"
-      }`}
-    >
-      <Sparkles className="h-4 w-4 text-[#D4A359]" />
+    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#22223B]">
+      <Sparkles className="h-4 w-4 text-[#F2E9E4]" />
     </div>
   );
 }
@@ -326,8 +328,8 @@ function Message({ message }: { message: ChatMessage }) {
   if (message.role === "user") {
     return (
       <div className="cn-rise flex justify-end">
-        <div className="max-w-[80%] rounded-2xl rounded-br-md border border-[#2B2B30] bg-[#1A1A1D] px-4 py-2.5 text-[#EAE7E0]">
-          <p className="whitespace-pre-wrap text-[14px] leading-6">{message.question}</p>
+        <div className="max-w-[80%] rounded-2xl rounded-br-md bg-[#22223B] px-4 py-2.5 text-[#F2E9E4]">
+          <p className="whitespace-pre-wrap text-[14.5px] leading-6">{message.question}</p>
         </div>
       </div>
     );
@@ -338,8 +340,8 @@ function Message({ message }: { message: ChatMessage }) {
       <AssistantAvatar />
       <div className="min-w-0 flex-1 pt-0.5">
         {message.error ? (
-          <div className="flex items-center gap-2 rounded-lg border border-[#D4A359]/30 bg-[#D4A359]/[0.06] px-3.5 py-2.5 text-[13px] text-[#C2C0B8]">
-            <CircleAlert className="h-4 w-4 shrink-0 text-[#D4A359]" />
+          <div className="flex items-center gap-2 rounded-lg border border-[#22223B]/30 bg-[#22223B]/[0.05] px-3.5 py-2.5 text-[13.5px] text-[#2E2F4A]">
+            <CircleAlert className="h-4 w-4 shrink-0" />
             {message.error}
           </div>
         ) : (
@@ -350,7 +352,7 @@ function Message({ message }: { message: ChatMessage }) {
                 <button
                   type="button"
                   onClick={handleCopy}
-                  className="mt-3 flex items-center gap-1.5 text-[11.5px] text-[#726E67] opacity-0 transition-opacity hover:text-[#EAE7E0] focus-visible:opacity-100 group-hover/answer:opacity-100"
+                  className="mt-3 flex items-center gap-1.5 text-[12px] text-[#5F6380] opacity-0 transition-opacity hover:text-[#22223B] focus-visible:opacity-100 group-hover/answer:opacity-100"
                 >
                   {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                   <span>{copied ? "Copied" : "Copy answer"}</span>
@@ -385,7 +387,7 @@ function RichText({ text }: { text: string }) {
           .map((block, blockIndex) => (
             <p
               key={`${index}-${blockIndex}`}
-              className="whitespace-pre-wrap text-[14.5px] leading-7 text-[#D2D0C8]"
+              className="whitespace-pre-wrap text-[15px] leading-7 text-[#22223B]"
             >
               <Inline text={block} />
             </p>
@@ -404,7 +406,7 @@ function Inline({ text }: { text: string }) {
           return (
             <code
               key={index}
-              className="rounded-md border border-[#232326] bg-[#171719] px-1.5 py-0.5 font-mono text-[12.5px] text-[#E8C48A]"
+              className="rounded-md bg-[#22223B]/[0.08] px-1.5 py-0.5 font-mono text-[12.5px] text-[#22223B]"
             >
               {piece.slice(1, -1)}
             </code>
@@ -412,7 +414,7 @@ function Inline({ text }: { text: string }) {
         }
         if (piece.length > 4 && piece.startsWith("**") && piece.endsWith("**")) {
           return (
-            <strong key={index} className="font-semibold text-[#EAE7E0]">
+            <strong key={index} className="font-bold">
               {piece.slice(2, -2)}
             </strong>
           );
@@ -442,19 +444,19 @@ function CodeBlock({ raw }: { raw: string }) {
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border border-[#232326] bg-[#0B0B0C]">
-      <div className="flex items-center justify-between border-b border-[#1B1B1E] bg-[#111113] px-3.5 py-2">
-        <span className="font-mono text-[11px] text-[#726E67]">{language || "code"}</span>
+    <div className="cn-dark overflow-hidden rounded-xl bg-[#22223B]">
+      <div className="flex items-center justify-between border-b border-[#4A4E69]/60 px-3.5 py-2">
+        <span className="font-mono text-[11px] text-[#F2E9E4]/60">{language || "code"}</span>
         <button
           type="button"
           onClick={handleCopy}
-          className="flex items-center gap-1.5 text-[11px] text-[#726E67] transition-colors hover:text-[#EAE7E0]"
+          className="flex items-center gap-1.5 text-[11.5px] text-[#F2E9E4]/65 transition-colors hover:text-[#F2E9E4]"
         >
-          {copied ? <Check className="h-3 w-3 text-[#D4A359]" /> : <Copy className="h-3 w-3" />}
+          {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
           <span>{copied ? "Copied" : "Copy"}</span>
         </button>
       </div>
-      <pre className="custom-scrollbar overflow-x-auto p-4 font-mono text-[12.5px] leading-6 text-[#C2C0B8]">
+      <pre className="custom-scrollbar overflow-x-auto p-4 font-mono text-[12.5px] leading-6 text-[#F2E9E4]">
         <code>{code}</code>
       </pre>
     </div>
@@ -467,7 +469,7 @@ function CodeBlock({ raw }: { raw: string }) {
 
 function NavigationView({ navigation }: { navigation: NavigationResult }) {
   return (
-    <div className="mt-7 space-y-6 border-t border-[#1E1E21] pt-6">
+    <div className="mt-7 space-y-6 border-t border-[#4A4E69]/20 pt-6">
       {navigation.steps.length > 0 && <ExecutionFlow steps={navigation.steps} />}
       {navigation.branches.length > 0 && <Branches branches={navigation.branches} />}
       {navigation.steps.length > 0 && <Sources steps={navigation.steps} />}
@@ -483,11 +485,12 @@ function ExecutionFlow({ steps }: { steps: NavigationStep[] }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
         className="group flex w-full items-center justify-between"
       >
         <SectionHeader icon={<GitBranch className="h-3.5 w-3.5" />} title="Execution flow" count={steps.length} />
         <ChevronRight
-          className={`h-3.5 w-3.5 text-[#726E67] transition-transform duration-200 group-hover:text-[#EAE7E0] ${
+          className={`h-3.5 w-3.5 text-[#5F6380] transition-transform duration-200 group-hover:text-[#22223B] ${
             open ? "rotate-90" : ""
           }`}
         />
@@ -511,27 +514,27 @@ function ExecutionFlow({ steps }: { steps: NavigationStep[] }) {
 function NavigationStepCard({ step, isLast }: { step: NavigationStep; isLast: boolean }) {
   return (
     <div className="flex gap-3.5">
-      {/* Timeline rail */}
+      {/* Timeline rail: this is a real sequence, so the steps are numbered */}
       <div className="flex w-6 shrink-0 flex-col items-center">
-        <div className="flex h-6 w-6 items-center justify-center rounded-full border border-[#D4A359]/50 bg-[#D4A359]/10 font-mono text-[10.5px] text-[#E8C48A]">
+        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#22223B] font-mono text-[10.5px] text-[#F2E9E4]">
           {step.order}
         </div>
-        {!isLast && <div className="w-px flex-1 bg-gradient-to-b from-[#D4A359]/40 to-[#232326]" />}
+        {!isLast && <div className="w-px flex-1 bg-[#4A4E69]/35" />}
       </div>
 
       <div className={`min-w-0 flex-1 ${isLast ? "" : "pb-2"}`}>
-        <div className="rounded-xl border border-[#232326] bg-[#121214] p-3.5 transition-colors hover:border-[#2F2F35]">
-          <div className="flex flex-wrap items-center gap-1.5 font-mono text-[12px] text-[#EAE7E0]">
-            <FileCode2 className="h-3.5 w-3.5 text-[#726E67]" />
-            <span className="break-all">{step.filePath}</span>
+        <div className="rounded-xl border border-[#4A4E69]/25 bg-white/60 p-3.5">
+          <div className="flex flex-wrap items-center gap-1.5 font-mono text-[12px]">
+            <FileCode2 className="h-3.5 w-3.5 text-[#4A4E69]" />
+            <span className="break-all font-medium">{step.filePath}</span>
             {step.symbol && (
               <>
-                <ChevronRight className="h-3 w-3 text-[#454340]" />
-                <span className="text-[#E8C48A]">{step.symbol}</span>
+                <ChevronRight className="h-3 w-3 text-[#6B6F88]" />
+                <span className="text-[#4A4E69]">{step.symbol}</span>
               </>
             )}
           </div>
-          <p className="mt-2 text-[13px] leading-6 text-[#9E9A92]">{step.explanation}</p>
+          <p className="mt-2 text-[13.5px] leading-6 text-[#4A4E69]">{step.explanation}</p>
         </div>
         {!isLast && <RelationshipConnector relationship={step.relationshipFromPrevious} />}
       </div>
@@ -542,7 +545,7 @@ function NavigationStepCard({ step, isLast }: { step: NavigationStep; isLast: bo
 function RelationshipConnector({ relationship }: { relationship?: string }) {
   return (
     <div className="py-2.5">
-      <span className="rounded-full border border-[#232326] bg-[#141417] px-2.5 py-0.5 text-[11px] text-[#726E67]">
+      <span className="rounded-full border border-[#4A4E69]/30 bg-white/60 px-2.5 py-0.5 text-[11.5px] text-[#4A4E69]">
         {relationship ?? "related"}
       </span>
     </div>
@@ -556,11 +559,12 @@ function Branches({ branches }: { branches: NavigationBranch[] }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
         className="group flex w-full items-center justify-between"
       >
         <SectionHeader icon={<GitBranch className="h-3.5 w-3.5" />} title="Related paths" count={branches.length} />
         <ChevronRight
-          className={`h-3.5 w-3.5 text-[#726E67] transition-transform duration-200 group-hover:text-[#EAE7E0] ${
+          className={`h-3.5 w-3.5 text-[#5F6380] transition-transform duration-200 group-hover:text-[#22223B] ${
             open ? "rotate-90" : ""
           }`}
         />
@@ -571,14 +575,14 @@ function Branches({ branches }: { branches: NavigationBranch[] }) {
           {branches.map((branch, index) => (
             <div
               key={`${branch.filePath}-${index}`}
-              className="rounded-xl border border-[#232326] bg-[#121214] p-3 font-mono text-[11.5px]"
+              className="rounded-xl border border-[#4A4E69]/25 bg-white/60 p-3 font-mono text-[11.5px]"
             >
-              <div className="flex items-center gap-1.5 text-[#EAE7E0]">
-                <FileCode2 className="h-3.5 w-3.5 text-[#726E67]" />
-                <span className="break-all">{branch.filePath}</span>
+              <div className="flex items-center gap-1.5">
+                <FileCode2 className="h-3.5 w-3.5 text-[#4A4E69]" />
+                <span className="break-all font-medium">{branch.filePath}</span>
               </div>
               {branch.explanation && (
-                <p className="mt-1.5 font-sans text-[12.5px] leading-5 text-[#9E9A92]">{branch.explanation}</p>
+                <p className="mt-1.5 font-sans text-[13px] leading-5 text-[#4A4E69]">{branch.explanation}</p>
               )}
             </div>
           ))}
@@ -597,11 +601,11 @@ function Sources({ steps }: { steps: NavigationStep[] }) {
         {sources.map((source) => (
           <div
             key={`${source.filePath}-${source.startLine}`}
-            className="rounded-lg border border-[#232326] bg-[#121214] px-2.5 py-1.5 font-mono text-[11px] transition-colors hover:border-[#D4A359]/40"
+            className="rounded-full border border-[#4A4E69]/30 bg-white/60 px-3 py-1.5 font-mono text-[11px]"
           >
-            <span className="text-[#EAE7E0]">{source.filePath}</span>
-            <span className="ml-1.5 text-[#D4A359]/80">
-              L{source.startLine}–{source.endLine}
+            <span>{source.filePath}</span>
+            <span className="ml-1.5 text-[#4A4E69]">
+              lines {source.startLine}–{source.endLine}
             </span>
           </div>
         ))}
@@ -612,11 +616,11 @@ function Sources({ steps }: { steps: NavigationStep[] }) {
 
 function SectionHeader({ icon, title, count }: { icon: ReactNode; title: string; count?: number }) {
   return (
-    <div className="flex items-center gap-2 text-[12px] font-medium text-[#9E9A92]">
-      <span className="text-[#D4A359]">{icon}</span>
+    <div className="flex items-center gap-2 text-[13px] font-bold">
+      <span className="text-[#4A4E69]">{icon}</span>
       <span>{title}</span>
       {typeof count === "number" && (
-        <span className="rounded-full bg-[#1B1B1E] px-1.5 py-px font-mono text-[10px] text-[#726E67]">{count}</span>
+        <span className="rounded-full bg-[#22223B]/[0.08] px-1.5 py-px font-mono text-[10px] font-normal text-[#4A4E69]">{count}</span>
       )}
     </div>
   );
